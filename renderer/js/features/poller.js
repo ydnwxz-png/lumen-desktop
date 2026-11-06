@@ -76,9 +76,15 @@ async function loop() {
 
 function handleChats(list) {
   const fresh = [];
+  const readElsewhere = [];
   for (const c of list) {
     const prev = known.get(c.id);
-    if (!first && (prev === undefined || c.nodeMsg > prev) && c.unread) fresh.push({ c, isNew: !seen.has(c.id) });
+    if (!first && (prev === undefined || c.nodeMsg > prev)) {
+      if (c.unread) fresh.push({ c, isNew: !seen.has(c.id) });
+      // сообщение уже прочитано в другом месте (бот FunPay Cardinal, телефон, сайт) — FunPay снял «непрочитано»,
+      // но уведомить всё равно нужно: смотрим, кто написал
+      else readElsewhere.push({ c, prev: prev || 0, isNew: !seen.has(c.id) });
+    }
     known.set(c.id, c.nodeMsg);
   }
   let seenChanged = false;
@@ -94,6 +100,29 @@ function handleChats(list) {
   bus.emit('chats', list);
   badge(list.filter((c) => c.unread && !meta(c.id).muted && !meta(c.id).archived).length);
   for (const f of fresh) incoming(f.c, f.isNew);
+  if (readElsewhere.length) checkReadElsewhere(readElsewhere.slice(0, 5));
+}
+
+// Чаты, где новое сообщение кто-то уже прочитал. /chat/history не отмечает чат прочитанным.
+const checking = new Set();
+async function checkReadElsewhere(items) {
+  const my = gen;
+  const me = String(S.me?.userId || '');
+  for (const { c, prev, isNew } of items) {
+    if (checking.has(c.id) || !S.backend?.history) continue;
+    checking.add(c.id);
+    try {
+      const r = await S.backend.history(c.id);
+      if (my !== gen) return;
+      // только чужие (покупатель или FunPay об оплате); свои и ответы бота с твоего аккаунта — пропускаем
+      const news = (r.messages || []).filter((m) => m.id > prev && m.id <= c.nodeMsg && String(m.authorId) !== me);
+      const m = news[news.length - 1];
+      if (m) incoming({ ...c, preview: m.text || (m.image ? 'Изображение' : c.preview) }, isNew);
+    } catch {
+    } finally {
+      checking.delete(c.id);
+    }
+  }
 }
 
 function incoming(c, isNew) {

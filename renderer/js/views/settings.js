@@ -6,7 +6,7 @@ import { seg, switchEl, confirmBox, ok, err, toast, busy } from '../ui/kit.js';
 import { NICK_STYLES, nickHtml, myNick } from '../features/nicks.js';
 import { fxHas } from '../features/fx.js';
 import { VARS } from '../features/templates.js';
-import { sound, notify } from '../features/notify.js';
+import { sound, notify, SOUNDS } from '../features/notify.js';
 import { applyLook } from '../ui/look.js';
 import { dndTick, dndOn, dndOff } from '../features/later.js';
 
@@ -164,6 +164,20 @@ window.addEventListener('message', async (e) => {
   } else ok('Ключ скопирован', '');
 });
 
+function soundPick(key, def, kind) {
+  const cur = S.settings.notify[key] || def;
+  const box = el(`<div class="row" style="gap:6px"><select class="select" style="width:170px;height:34px">${Object.entries(SOUNDS)
+    .map(([id, x]) => `<option value="${id}" ${id === cur ? 'selected' : ''}>${esc(x.name)}</option>`)
+    .join('')}</select><button class="btn sm" title="Послушать">${icon('play', 14)}</button></div>`);
+  const sel = box.querySelector('select');
+  sel.onchange = () => {
+    set((s) => (s.notify[key] = sel.value));
+    sound(kind, sel.value);
+  };
+  box.querySelector('button').onclick = () => sound(kind, sel.value);
+  return box;
+}
+
 function notif(w) {
   head(w, 'Уведомления', 'Когда окно свёрнуто — всплывают в углу экрана.');
   const n = S.settings.notify;
@@ -185,10 +199,15 @@ function notif(w) {
       row('Угол экрана', 'Для уведомлений Lumen', segEl([['tl', '↖'], ['tr', '↗'], ['bl', '↙'], ['br', '↘']], n.corner, (v) => set((s) => (s.notify.corner = v)))),
       row('Показывать текст', 'Иначе просто «Новое сообщение»', sw(n.preview, (v) => set((s) => (s.notify.preview = v)))),
       row('Когда окно открыто', 'Тоже показывать всплывашку внутри окна', sw(n.whenFocused, (v) => set((s) => (s.notify.whenFocused = v)))),
-      row('Новые заказы', 'Отдельное уведомление и звук монеток', sw(n.orders, (v) => set((s) => (s.notify.orders = v)))),
+      row('Новые заказы', 'Отдельное уведомление со своим звуком', sw(n.orders, (v) => set((s) => (s.notify.orders = v)))),
       row('Тест', '', test)
     ),
-    group(row('Звук', '', sw(n.sound, (v) => set((s) => (s.notify.sound = v)))), row('Громкость', '', vol))
+    group(
+      row('Звук', '', sw(n.sound, (v) => set((s) => (s.notify.sound = v)))),
+      row('Звук сообщения', 'Нажми ▶, чтобы послушать', soundPick('msgSound', 'lumen', 'msg')),
+      row('Звук заказа', 'Когда покупатель оплатил', soundPick('orderSound', 'coins', 'order')),
+      row('Громкость', '', vol)
+    )
   );
   // Не беспокоить
   const d = S.settings.dnd;

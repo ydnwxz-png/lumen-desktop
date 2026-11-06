@@ -205,6 +205,7 @@ function createWindow() {
       nodeIntegration: false,
       sandbox: true,
       backgroundThrottling: false,
+      autoplayPolicy: 'no-user-gesture-required', // звук уведомлений сразу после запуска, без клика по окну
       spellcheck: true,
       webviewTag: true, // встроенная панель FunPay
     },
