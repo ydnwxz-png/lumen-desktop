@@ -246,7 +246,10 @@ function loop() {
       drawn = false;
       return;
     }
-    const dt = Math.min(3, (now - last) / 16.7);
+    // частицы рисуем ~30 раз в секунду (а когда окно не в фокусе — ~10): на 120 Гц экранах Mac иначе грелся бы ноутбук
+    const gap = document.hasFocus() ? 33 : 100;
+    if (now - last < gap - 2) return requestAnimationFrame(step);
+    const dt = Math.min(6, (now - last) / 16.7);
     last = now;
     if (!document.hidden) {
       if (drawn) lctx.clearRect(0, 0, innerWidth, innerHeight);

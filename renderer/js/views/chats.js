@@ -489,9 +489,15 @@ function setMessages(list) {
 
 function appendDom(list, anim) {
   let prev = lastRendered();
+  // какой день уже подписан последним — берём из самой ленты, чтобы «Сегодня» не повторялось (иначе плашки слипаются стопкой)
+  const days = innerEl.querySelectorAll('.day');
+  let lastDay = days.length ? days[days.length - 1].dataset.k : '';
   for (const m of list) {
     const d = m.ts ? new Date(m.ts) : null;
-    if (d && (!prev || dayKey(d) !== dayKey(new Date(prev.ts || 0)))) innerEl.append(el(`<div class="day">${dayLabel(d)}</div>`));
+    if (d && dayKey(d) !== lastDay) {
+      lastDay = dayKey(d);
+      innerEl.append(el(`<div class="day" data-k="${esc(String(lastDay))}">${dayLabel(d)}</div>`));
+    }
     if (isSys(m)) innerEl.append(el(sysHtml(m)));
     else {
       let g = innerEl.lastElementChild;

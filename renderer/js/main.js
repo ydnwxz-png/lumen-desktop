@@ -241,6 +241,11 @@ async function boot() {
   await loadSettings();
   applyLook();
   initTips();
+  // окно свернули или ушли в другое приложение — ставим анимации на паузу (меньше нагрузка и нагрев)
+  const idle = () => (document.hidden || !document.hasFocus() ? (document.documentElement.dataset.idle = '1') : delete document.documentElement.dataset.idle);
+  addEventListener('blur', idle);
+  addEventListener('focus', idle);
+  document.addEventListener('visibilitychange', idle);
   shell();
   initFx();
   bus.on('nav', (v, sub) => go(v, sub));

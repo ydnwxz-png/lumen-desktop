@@ -108,11 +108,13 @@ a { color: inherit; text-decoration: none; }
 
 /* фон-аврора */
 .backdrop { position: fixed; inset: 0; z-index: 0; pointer-events: none; overflow: hidden; }
-.backdrop i { position: absolute; width: 60vmax; height: 60vmax; border-radius: 50%; filter: blur(90px); opacity: .17; will-change: transform; }
-.backdrop i:nth-child(1) { background: var(--a1); top: -30vmax; left: -15vmax; animation: drift1 28s ease-in-out infinite alternate; }
-.backdrop i:nth-child(2) { background: var(--a2); bottom: -35vmax; right: -20vmax; animation: drift2 34s ease-in-out infinite alternate; }
-.backdrop i:nth-child(3) { background: var(--a1); top: 30%; left: 45%; width: 30vmax; height: 30vmax; opacity: .07; animation: drift3 40s ease-in-out infinite alternate; }
+.backdrop i { position: absolute; width: 60vmax; height: 60vmax; border-radius: 50%; filter: blur(90px); opacity: .17; }
+.backdrop i:nth-child(1) { background: var(--a1); top: -30vmax; left: -15vmax; }
+.backdrop i:nth-child(2) { background: var(--a2); bottom: -35vmax; right: -20vmax; }
+.backdrop i:nth-child(3) { background: var(--a1); top: 30%; left: 45%; width: 30vmax; height: 30vmax; opacity: .07; }
 [data-theme='light'] .backdrop i { opacity: .12; }
+/* окно не в фокусе — бесконечные анимации на паузе, чтобы не грузить проц/видеокарту */
+html[data-idle] *, html[data-idle] *::before, html[data-idle] *::after { animation-play-state: paused !important; }
 [data-bg='solid'] .backdrop, [data-bg='oled'] .backdrop { display: none; }
 .backdrop::after { content: ''; position: absolute; inset: 0; opacity: .035; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"); }
 @keyframes drift1 { to { transform: translate(18vmax, 12vmax) scale(1.15); } }
@@ -571,8 +573,8 @@ a { color: inherit; text-decoration: none; }
 /* ================================================================ профиль */
 .prof-banner { height: 150px; position: relative; overflow: hidden; background: linear-gradient(135deg, hsl(var(--h1) 70% 45%), hsl(var(--h2) 75% 35%)); }
 .prof-banner i { position: absolute; border-radius: 50%; filter: blur(30px); opacity: .7; }
-.prof-banner i:nth-child(1) { width: 200px; height: 200px; background: hsl(var(--h2) 90% 65%); left: 10%; top: -40%; animation: drift1 14s ease-in-out infinite alternate; }
-.prof-banner i:nth-child(2) { width: 160px; height: 160px; background: hsl(var(--h1) 90% 70%); right: 8%; bottom: -50%; animation: drift2 18s ease-in-out infinite alternate; }
+.prof-banner i:nth-child(1) { width: 200px; height: 200px; background: hsl(var(--h2) 90% 65%); left: 10%; top: -40%; }
+.prof-banner i:nth-child(2) { width: 160px; height: 160px; background: hsl(var(--h1) 90% 70%); right: 8%; bottom: -50%; }
 .prof-top { display: flex; align-items: flex-start; gap: 18px; padding: 0 26px; margin-top: -48px; position: relative; }
 .prof-top > .grow, .prof-top > .row { padding-top: 58px !important; padding-bottom: 0 !important; }
 .prof-top > .grow { min-width: 0; }

@@ -1,7 +1,7 @@
 {
   "name": "lumen-desktop",
   "productName": "Lumen",
-  "version": "1.6.0",
+  "version": "1.6.2",
   "description": "Lumen — красивый десктопный клиент FunPay: чаты, сделки, лоты, шаблоны",
   "main": "main/main.js",
   "author": "Lumen",
