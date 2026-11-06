@@ -9,14 +9,19 @@ concurrency: release
 jobs:
   windows:
     runs-on: windows-latest
+    defaults:
+      run:
+        shell: bash
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with: { node-version: 22 }
+      - name: Publish settings
+        run: node -e 'const fs=require("fs"),p=JSON.parse(fs.readFileSync("package.json"));const [o,r]=process.env.GITHUB_REPOSITORY.split("/");p.build.publish={provider:"github",owner:o,repo:r,releaseType:"release"};fs.writeFileSync("package.json",JSON.stringify(p,null,2))'
       - run: npm install --no-audit --no-fund
       - run: npm test
       - name: Build and publish
-        run: npx electron-builder --win --publish always -c.publish.provider=github -c.publish.owner=${{ github.repository_owner }} -c.publish.repo=${{ github.event.repository.name }} -c.publish.releaseType=release
+        run: npx electron-builder --win --publish always
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           CSC_IDENTITY_AUTO_DISCOVERY: false
@@ -27,9 +32,11 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with: { node-version: 22 }
+      - name: Publish settings
+        run: node -e 'const fs=require("fs"),p=JSON.parse(fs.readFileSync("package.json"));const [o,r]=process.env.GITHUB_REPOSITORY.split("/");p.build.publish={provider:"github",owner:o,repo:r,releaseType:"release"};fs.writeFileSync("package.json",JSON.stringify(p,null,2))'
       - run: npm install --no-audit --no-fund
       - name: Build and publish
-        run: npx electron-builder --mac --publish always -c.publish.provider=github -c.publish.owner=${{ github.repository_owner }} -c.publish.repo=${{ github.event.repository.name }} -c.publish.releaseType=release
+        run: npx electron-builder --mac --publish always
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           CSC_IDENTITY_AUTO_DISCOVERY: false
