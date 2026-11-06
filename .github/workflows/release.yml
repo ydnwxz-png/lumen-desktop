@@ -1,17 +1,15 @@
 name: Release
 on:
   workflow_dispatch:
-  push:
-    tags: ['v*']
 permissions:
   contents: write
 concurrency: release
+defaults:
+  run:
+    shell: bash
 jobs:
   windows:
     runs-on: windows-latest
-    defaults:
-      run:
-        shell: bash
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -20,11 +18,18 @@ jobs:
         run: node -e 'const fs=require("fs"),p=JSON.parse(fs.readFileSync("package.json"));const [o,r]=process.env.GITHUB_REPOSITORY.split("/");p.build.publish={provider:"github",owner:o,repo:r,releaseType:"release"};fs.writeFileSync("package.json",JSON.stringify(p,null,2))'
       - run: npm install --no-audit --no-fund
       - run: npm test
-      - name: Build and publish
-        run: npx electron-builder --win --publish always
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          CSC_IDENTITY_AUTO_DISCOVERY: false
+      - name: Build
+        run: npx electron-builder --win --publish never
+        env: { CSC_IDENTITY_AUTO_DISCOVERY: false }
+      - name: Create release
+        env: { GH_TOKEN: '${{ secrets.GITHUB_TOKEN }}' }
+        run: |
+          V=$(node -p 'require("./package.json").version')
+          if ! gh release view "v$V" >/dev/null 2>&1; then
+            git tag -f "v$V" && git push -f origin "v$V"
+            gh release create "v$V" --title "Lumen $V" --notes "Windows: Lumen-Setup-$V.exe (установщик) или Lumen-Portable-$V.exe. macOS: .dmg (arm64 — M1–M4, x64 — Intel)." --verify-tag
+          fi
+          gh release upload "v$V" dist/Lumen-Setup-*.exe dist/Lumen-Portable-*.exe dist/*.blockmap dist/latest.yml --clobber
   mac:
     needs: windows
     runs-on: macos-latest
@@ -35,8 +40,11 @@ jobs:
       - name: Publish settings
         run: node -e 'const fs=require("fs"),p=JSON.parse(fs.readFileSync("package.json"));const [o,r]=process.env.GITHUB_REPOSITORY.split("/");p.build.publish={provider:"github",owner:o,repo:r,releaseType:"release"};fs.writeFileSync("package.json",JSON.stringify(p,null,2))'
       - run: npm install --no-audit --no-fund
-      - name: Build and publish
-        run: npx electron-builder --mac --publish always
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          CSC_IDENTITY_AUTO_DISCOVERY: false
+      - name: Build
+        run: npx electron-builder --mac --publish never
+        env: { CSC_IDENTITY_AUTO_DISCOVERY: false }
+      - name: Upload to release
+        env: { GH_TOKEN: '${{ secrets.GITHUB_TOKEN }}' }
+        run: |
+          V=$(node -p 'require("./package.json").version')
+          gh release upload "v$V" dist/*.dmg $(ls dist/*.dmg.blockmap dist/latest-mac.yml 2>/dev/null) --clobber
