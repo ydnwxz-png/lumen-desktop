@@ -63,7 +63,10 @@
         }
       ],
       "category": "public.app-category.social-networking",
-      "artifactName": "Lumen-${version}-${arch}.${ext}"
+      "artifactName": "Lumen-${version}-${arch}.${ext}",
+      "identity": "-",
+      "hardenedRuntime": false,
+      "gatekeeperAssess": false
     },
     "linux": {
       "target": [
@@ -73,6 +76,9 @@
     },
     "portable": {
       "artifactName": "Lumen-Portable-${version}.${ext}"
+    },
+    "dmg": {
+      "title": "Lumen"
     }
   },
   "dependencies": {
