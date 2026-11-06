@@ -1,0 +1,66 @@
+<!doctype html><meta charset="utf-8"><title>client tests</title>
+<script type="module">
+const calls = [];
+let raiseN = 0;
+const BM = '<a class="contact-item unread" data-id="9" data-node-msg="20" data-user-msg="10"><div class="media-user-name">bob</div><div class="contact-item-message">hi</div></a>';
+const MSG = (id) => ({ id, author: 5, html: `<div class="chat-msg-item chat-msg-with-head" id="message-${id}"><div class="media-user-name"><a class="chat-msg-author-link" href="/users/5/">bob</a><div class="chat-msg-date" title="16:00:00"></div></div><div class="chat-msg-text">m${id}</div></div>` });
+window.api = { fp: {
+  auth: async () => ({ userId: '42', username: 'me', balance: '10 ₽' }),
+  runner: async (id, objects, request) => {
+    calls.push(['runner', JSON.parse(objects), request === 'false' ? false : JSON.parse(request)]);
+    const objs = JSON.parse(objects).map((o) => o.type === 'chat_bookmarks' ? { type: o.type, data: { html: BM } } : { type: 'chat_node', data: { messages: [MSG(19), MSG(20)] } });
+    return { objects: objs, response: request === 'false' ? false : { error: null } };
+  },
+  req: async (id, o) => {
+    calls.push(['req', o]);
+    if (o.url === '/users/42/') return { status: 200, text: '<div class="offer-list-title-container" data-game-id="41"><h3><a href="https://funpay.com/lots/1004/">TG</a></h3></div><div class="offer-list-title-container"><h3><a href="https://funpay.com/lots/1005/">TG2</a></h3></div><div class="offer-list-title-container" data-game-id="9"><h3><a href="https://funpay.com/chips/77/">Gold</a></h3></div>' };
+    if (o.url === '/') return { status: 200, text: '<div class="promo-game-item"><div class="game-title" data-id="41"></div><ul class="list-inline"><li><a href="https://funpay.com/lots/1005/">x</a></li></ul></div>' };
+    if (o.url.startsWith('/users/transaction?id=')) return { status: 200, text: JSON.stringify({ html: '<table><tr><th>Описание</th><td>Вывод денег #1</td></tr><tr><th>Внешняя транзакция</th><td>ab <a href="https://tronscan.org/x">i</a></td></tr></table>' }) };
+    if (o.url === '/lots/raise') {
+      const f = o.form;
+      if (o.csrf) return { status: 200, text: JSON.stringify({ error: 1, msg: 'csrf не нужен' }) };
+      if (raiseN++ === 0) return { status: 200, text: JSON.stringify({ modal: 'x' }) };
+      if (!f.some(([k]) => k === 'node_ids[]')) return { status: 200, text: JSON.stringify({ modal: '<input type="checkbox" value="1004" checked><input type="checkbox" value="1006" checked>' }) };
+      return { status: 200, text: JSON.stringify({ error: 1, msg: 'Подождите 2 часа.' }) };
+    }
+    if (o.url.startsWith('/lots/offerEdit')) return { status: 200, text: '<form class="form-offer-editor"><input type="hidden" name="csrf_token" value="x"><input type="hidden" name="offer_id" value="555"><input name="price" value="10"><input name="amount" value="0"><input type="hidden" name="active" value=""><input type="checkbox" name="active" checked></form>' };
+    if (o.url === '/lots/offerSave') return { status: 200, text: JSON.stringify({ done: true }) };
+    if (o.url === '/orders/refund') return { status: 200, text: JSON.stringify({ error: 1, msg: 'Нельзя' }) };
+    if (o.url.startsWith('/orders/trade')) return { status: 200, text: '<input name="continue" value="c2">' };
+    return { status: 404, text: '' };
+  },
+} };
+const { createClient } = await import('../renderer/js/fp/client.js');
+const out = [];
+const eq = (a, b, m) => { const ok = JSON.stringify(a) === JSON.stringify(b); out.push((ok ? 'ok   ' : 'FAIL ') + m + (ok ? '' : `  got ${JSON.stringify(a)} want ${JSON.stringify(b)}`)); };
+const c = createClient('a1');
+await c.auth();
+const p = await c.poll('9', 19);
+eq([p.chats.length, p.chats[0].id, p.messages.map((m) => m.id)], [1, '9', [20]], 'poll filters > lastId');
+eq(calls[0][1][1], { type: 'chat_node', id: '9', tag: '00000000', data: { node: '9', last_message: 19, content: '' } }, 'poll chat_node object');
+await c.send('9', 'привет');
+eq(calls[calls.length - 1][2], { action: 'chat_message', data: { node: '9', last_message: -1, content: 'привет' } }, 'send request');
+const games = await c.raiseGames();
+eq(games, [{ game: '41', title: 'TG', nodes: ['1004', '1005'] }], 'raise games grouped + map from main page, chips skipped');
+const r = await c.raiseGame('41', ['1004', '1005']);
+const raiseCalls = calls.filter((x) => x[1]?.url === '/lots/raise');
+eq([r.ok, Math.round(r.wait / 60e3), raiseCalls.length, raiseCalls[2][1].form.filter(([k]) => k === 'node_ids[]').map((x) => x[1])], [false, 90, 3, ['1004', '1006']], 'raise: modal → ids → wait');
+const ti = await c.txnInfo('5');
+eq([ti.title, ti.link, ti.rows[1][1]], ['Вывод денег #1', 'https://tronscan.org/x', 'ab i'], 'txn info');
+await c.lotSetActive({ id: '555', node: '1004' }, false);
+let save = calls.filter((x) => x[1]?.url === '/lots/offerSave').pop()[1].form;
+eq(save.filter(([k]) => k === 'active').map((x) => x[1]), [''], 'lot off');
+eq(save.some(([k]) => k === 'csrf_token'), false, 'stale csrf dropped (main adds fresh)');
+await c.lotSetActive({ id: '555', node: '1004' }, true);
+save = calls.filter((x) => x[1]?.url === '/lots/offerSave').pop()[1].form;
+eq([save.filter(([k]) => k === 'active').map((x) => x[1]), save.find(([k]) => k === 'amount')[1], save.find(([k]) => k === 'node_id')[1]], [['', 'on'], '1', '1004'], 'lot on');
+await c.lotSetPrice({ id: '555', node: '1004' }, 99);
+save = calls.filter((x) => x[1]?.url === '/lots/offerSave').pop()[1].form;
+eq(save.find(([k]) => k === 'price')[1], '99', 'lot price');
+let e = null; try { await c.refund('X'); } catch (x) { e = x.message; }
+eq(e, 'Нельзя', 'refund error surfaces');
+const t = await c.trades('sales', 'paid', '');
+eq([calls[calls.length - 1][1].url, t.next], ['/orders/trade?state=paid', 'c2'], 'trades url');
+document.title = out.some((x) => x.startsWith('FAIL')) ? 'FAIL' : 'PASS';
+document.body.textContent = out.join('\n');
+</script>

@@ -1,0 +1,318 @@
+// Запуск, навигация, аккаунты, горячие клавиши.
+import { $, $$, el, esc, avatar } from './core/util.js';
+import { icon } from './core/icons.js';
+import { S, bus, loadSettings, loadMeta, saveSettings } from './core/state.js';
+import { applyLook } from './ui/look.js';
+import { initTips, menu, err, toast } from './ui/kit.js';
+import { palette } from './ui/palette.js';
+import { winControls } from './ui/winctl.js';
+import { closeWebPane } from './ui/webpane.js';
+import { initFx } from './features/fx.js';
+import { createClient } from './fp/client.js';
+import { createDemo } from './fp/demo.js';
+import { start as startPoll, stop as stopPoll, pollNow, CS } from './features/poller.js';
+import { resetRaise } from './features/raise.js';
+import { loadLater, dndTick, dndOn, dndOff } from './features/later.js';
+import { myNick } from './features/nicks.js';
+import { mountChats, chatKeys } from './views/chats.js';
+import { mountDeals, showDeals } from './views/deals.js';
+import { mountFinance, showFinance } from './views/finance.js';
+import { mountLots, showLots } from './views/lots.js';
+import { mountAutomation, showAutomation } from './views/automation.js';
+import { mountSettings, showSettings } from './views/settings.js';
+import { showLogin } from './views/login.js';
+import { openProfile } from './views/profile.js';
+
+const NAV = [
+  ['chats', 'Чаты', 'chat'],
+  ['deals', 'Сделки', 'bag'],
+  ['finance', 'Финансы', 'wallet'],
+  ['lots', 'Лоты', 'box'],
+  ['auto', 'Автоматика и плагины', 'bot'],
+];
+
+function shell() {
+  const app = el(`<div id="app">
+    <header class="titlebar">
+      <div class="brand"><img class="brand-logo" src="../assets/icon.png" alt="">Lumen<small data-me-name></small></div>
+      <button class="tb-search" data-pal>${icon('search', 15)}Поиск чатов, заказов, команд<span class="kbd">Ctrl K</span></button>
+      <div class="tb-right">
+        <button class="upd-chip hidden" data-upd></button>
+        <button class="dnd-chip hidden" data-dnd data-tip="«Не беспокоить» включено. Нажми, чтобы выключить">${icon('moon', 14)}<span>Не беспокоить</span></button>
+        <span class="demo-chip hidden" data-demo>ДЕМО</span>
+        <div class="tb-status load" data-status><span class="dot"></span><span data-st-t>Подключаюсь…</span></div>
+        <span data-wctl></span>
+      </div>
+    </header>
+    <div class="shell">
+      <nav class="rail">
+        <span class="rail-ind"></span>
+        ${NAV.map(([id, n, ic]) => `<button class="rail-btn" data-nav="${id}" data-tip="${n}">${icon(ic, 22)}${id === 'chats' ? '<span class="badge hidden" data-unread></span>' : ''}</button>`).join('')}
+        <span class="rail-sp"></span>
+        <button class="rail-btn" data-browser data-tip="FunPay в браузере">${icon('globe', 21)}</button>
+        <button class="rail-btn" data-nav="settings" data-tip="Настройки">${icon('settings', 21)}</button>
+        <button class="rail-me" data-me></button>
+      </nav>
+      <main class="stage">
+        <section class="view" id="v-chats"></section>
+        <section class="view" id="v-deals"></section>
+        <section class="view" id="v-finance"></section>
+        <section class="view" id="v-lots"></section>
+        <section class="view" id="v-auto"></section>
+        <section class="view" id="v-settings"></section>
+        <section class="view" id="v-error"></section>
+      </main>
+    </div></div>`);
+  app.querySelector('[data-wctl]').replaceWith(winControls());
+  document.body.append(app);
+  mountChats($('#v-chats'));
+  mountDeals($('#v-deals'));
+  mountFinance($('#v-finance'));
+  mountLots($('#v-lots'));
+  mountAutomation($('#v-auto'));
+  mountSettings($('#v-settings'));
+  $('.rail').onclick = (e) => {
+    const n = e.target.closest('[data-nav]');
+    if (n) go(n.dataset.nav);
+    if (e.target.closest('[data-browser]')) S.backend?.openBrowser('https://funpay.com/');
+    const me = e.target.closest('[data-me]');
+    if (me) meMenu(me);
+  };
+  $('[data-pal]').onclick = palette;
+  $('[data-dnd]').onclick = () => toggleDnd(false);
+  $('[data-upd]').onclick = () => {
+    const st = S.update || {};
+    if (st.state === 'ready') window.api.upd.install();
+    else if (st.state === 'manual' || st.state === 'available') window.api.upd.download();
+  };
+  addEventListener('resize', moveInd);
+}
+
+function moveInd() {
+  const b = $(`.rail-btn[data-nav="${S.view}"]`);
+  const ind = $('.rail-ind');
+  if (!b || !ind) return;
+  ind.style.transform = `translateY(${b.offsetTop}px)`;
+  ind.style.opacity = '1';
+}
+
+export function go(view, sub) {
+  if (!S.me && view !== 'error') return;
+  closeWebPane();
+  S.view = view;
+  $$('.view').forEach((v) => v.classList.toggle('on', v.id === 'v-' + view));
+  $$('.rail-btn[data-nav]').forEach((b) => b.classList.toggle('on', b.dataset.nav === view));
+  moveInd();
+  if (view === 'deals') showDeals();
+  if (view === 'finance') showFinance();
+  if (view === 'lots') showLots();
+  if (view === 'auto') showAutomation();
+  if (view === 'settings') showSettings(sub);
+}
+
+function renderMe() {
+  const me = S.me;
+  $('[data-me]').innerHTML = me ? avatar(me.avatar, me.username, 38) : '';
+  $('[data-me]').dataset.tip = me ? me.username : '';
+  $('[data-me-name]').innerHTML = me ? `· ${myNick(me.username)}` : '';
+  $('[data-demo]').classList.toggle('hidden', !S.demo);
+}
+
+async function meMenu(btn) {
+  const r = btn.getBoundingClientRect();
+  const dnd = dndTick();
+  const items = [
+    { header: S.me?.username || '' },
+    { label: 'Мой профиль', icon: 'user', run: () => openProfile(S.me.userId) },
+    { label: 'Стиль ника', icon: 'sparkles', run: () => go('settings', 'nick') },
+    { label: dnd ? 'Выключить «Не беспокоить»' : 'Не беспокоить', icon: dnd ? 'bell' : 'moon', run: () => toggleDnd(!dnd) },
+    '-',
+  ];
+  if (window.api) {
+    const { list, active } = await window.api.acc.list();
+    for (const a of list) if (a.id !== active || S.demo) items.push({ label: a.username, icon: 'users', hint: 'переключиться', run: () => startAccount(a.id) });
+    items.push({ label: 'Добавить аккаунт', icon: 'plus', run: addAccount }, '-', { label: 'Выйти из программы', icon: 'power', danger: true, run: () => window.api.app.quit() });
+  } else items.push({ label: 'Выйти из демо', icon: 'logout', run: () => location.reload() });
+  menu(r.right + 10, r.bottom - 260, items);
+}
+
+function toggleDnd(on) {
+  on ? dndOn() : dndOff();
+  saveSettings();
+  dndTick();
+  toast(on ? 'Не беспокоить — включено' : 'Уведомления снова включены', on ? 'Звука и всплывашек не будет' : '', { icon: on ? 'moon' : 'bell', ms: 2500 });
+}
+
+// Обновления: значок в шапке + одно уведомление, когда всё готово
+let updToasted = '';
+function onUpdate(st) {
+  S.update = st;
+  bus.emit('update', st);
+  const b = $('[data-upd]');
+  const show = { ready: `${icon('refresh', 14)}Обновить до ${st.latest}`, manual: `${icon('down', 14)}Вышла версия ${st.latest}`, available: `${icon('down', 14)}Скачать ${st.latest}`, downloading: `${icon('down', 14)}Обновление ${st.percent || 0}%` }[st.state];
+  b.classList.toggle('hidden', !show);
+  if (show) b.innerHTML = show;
+  b.dataset.tip = st.state === 'ready' ? 'Lumen перезапустится с новой версией' : st.state === 'manual' ? 'Откроется страница загрузки' : '';
+  if ((st.state === 'ready' || st.state === 'manual') && updToasted !== st.latest) {
+    updToasted = st.latest;
+    toast(st.state === 'ready' ? `Обновление ${st.latest} готово` : `Вышел Lumen ${st.latest}`, st.state === 'ready' ? 'Нажми, чтобы перезапустить. Или оно встанет само при выходе.' : 'Нажми, чтобы скачать', {
+      kind: 'ok',
+      icon: 'sparkles',
+      ms: 9000,
+      onClick: () => (st.state === 'ready' ? window.api.upd.install() : window.api.upd.download()),
+    });
+  }
+}
+
+function addAccount() {
+  showLogin((acc) => acc && startAccount(acc === 'demo' ? 'demo' : acc.id), { cancelable: true });
+}
+
+let retryTimer = null;
+let startGen = 0;
+async function startAccount(id) {
+  const my = ++startGen;
+  clearTimeout(retryTimer);
+  stopPoll();
+  S.demo = id === 'demo';
+  S.accId = S.demo ? null : id;
+  S.backend = S.demo ? createDemo() : createClient(id);
+  S.me = null;
+  if (!S.demo) window.api.acc.setActive(id).catch(() => {});
+  await loadMeta();
+  if (my !== startGen) return;
+  bus.emit('account');
+  setStatus('load');
+  let me;
+  try {
+    me = await S.backend.auth(false);
+  } catch (e) {
+    if (my === startGen) showError(e, id);
+    return;
+  }
+  if (my !== startGen) return;
+  S.me = me;
+  renderMe();
+  bus.emit('me');
+  startPoll();
+  loadLater();
+  if (!S.demo && window.api?.auto) window.api.auto.attach(id, S.settings.automation?.mode === 'pc' ? 'pc' : 'off').catch((e) => console.warn('автоматика:', e));
+  resetRaise();
+  go(S.view && S.view !== 'error' ? S.view : 'chats');
+}
+
+function showError(e, id) {
+  setStatus('err', e.message);
+  const v = $('#v-error');
+  v.innerHTML = `<div class="empty"><div class="orb" style="color:var(--bad)">${icon('alert', 32)}</div><h3>Не получилось подключиться</h3><p>${esc(e.message)}</p><div class="row" style="margin-top:6px"><button class="btn pri" data-r>${icon('refresh', 16)}Ещё раз</button><button class="btn" data-o>Другой аккаунт</button></div><p class="dim" style="font-size:12px;margin-top:8px">Попробую сам через 20 секунд</p></div>`;
+  S.view = 'error';
+  $$('.view').forEach((x) => x.classList.toggle('on', x === v));
+  $('[data-r]', v).onclick = () => startAccount(id);
+  $('[data-o]', v).onclick = addAccount;
+  retryTimer = setTimeout(() => S.view === 'error' && startAccount(id), 20000);
+}
+
+function setStatus(s, msg = '') {
+  const st = $('[data-status]');
+  st.className = 'tb-status ' + (s === 'ok' ? '' : s);
+  $('[data-st-t]').textContent = s === 'ok' ? (S.demo ? 'Демо' : 'На связи') : s === 'load' ? 'Подключаюсь…' : 'Нет связи';
+  st.dataset.tip = msg || (s === 'ok' ? 'Сообщения обновляются автоматически' : '');
+}
+
+function keys(e) {
+  if (document.querySelector('#login')) return;
+  const k = e.key.toLowerCase();
+  if ((e.ctrlKey || e.metaKey) && (k === 'k' || k === 'л')) {
+    e.preventDefault();
+    palette();
+  } else if ((e.ctrlKey || e.metaKey) && /^Digit[1-6]$/.test(e.code)) {
+    e.preventDefault();
+    go(['chats', 'deals', 'finance', 'lots', 'auto', 'settings'][+e.code.slice(5) - 1]);
+  } else if ((e.ctrlKey || e.metaKey) && (k === 'f' || k === 'а') && S.view === 'chats') {
+    e.preventDefault();
+    $('#chat-q')?.focus();
+  } else if (S.view === 'chats') chatKeys(e);
+}
+
+async function boot() {
+  if (/Mac/.test(navigator.platform)) document.body.classList.add('mac');
+  else if (/Linux/.test(navigator.platform) && window.api) document.body.classList.add('linux');
+  else if (/Win/.test(navigator.platform) && window.api) document.body.classList.add('win');
+  await loadSettings();
+  applyLook();
+  initTips();
+  shell();
+  initFx();
+  bus.on('nav', (v, sub) => go(v, sub));
+  bus.on('status', setStatus);
+  bus.on('switch-account', startAccount);
+  bus.on('add-account', addAccount);
+  bus.on('settings', () => (renderMe(), dndTick()));
+  bus.on('dnd', (a) => $('[data-dnd]').classList.toggle('hidden', !a));
+  bus.on('me', renderMe);
+  bus.on('auto-sent', () => toast('Автоответ отправлен', '', { kind: 'ok', icon: 'bot', ms: 2500 }));
+  bus.on('chats', (list) => {
+    const n = list.filter((c) => c.unread).length;
+    const b = $('[data-unread]');
+    b.classList.toggle('hidden', !n);
+    b.textContent = n > 99 ? '99+' : n;
+  });
+  bus.on('logout', async () => {
+    const { list } = await window.api.acc.list();
+    window.api.auto?.detach().catch(() => {});
+    if (list.length) startAccount(list[0].id);
+    else {
+      stopPoll();
+      S.me = null;
+      showLogin((acc) => startAccount(acc === 'demo' ? 'demo' : acc.id));
+    }
+  });
+  S.focused = document.hasFocus();
+  const focus = (f) => {
+    S.focused = f;
+    if (f) pollNow();
+  };
+  if (window.api) window.api.app.on('app:focus', focus);
+  addEventListener('focus', () => focus(true));
+  addEventListener('blur', () => focus(false));
+  addEventListener('keydown', keys);
+  // картинки, которые не загрузились: аватар → инициалы, в сообщении — подпись
+  document.addEventListener(
+    'error',
+    (e) => {
+      const t = e.target;
+      if (t.tagName !== 'IMG') return;
+      if (t.closest('.av')) t.remove();
+      else if (t.closest('.bub-img')) t.closest('.bub-img').innerHTML = '<div style="padding:14px;font-size:12px">Картинка недоступна</div>';
+    },
+    true
+  );
+
+  let started = false;
+  if (window.api) {
+    const { list, active } = await window.api.acc.list();
+    const id = list.find((a) => a.id === active)?.id || list[0]?.id;
+    if (id) {
+      started = true;
+      startAccount(id);
+    }
+  }
+  dndTick();
+  if (window.api?.upd) {
+    window.api.app.on('upd:state', onUpdate);
+    window.api.upd.state().then(onUpdate).catch(() => {});
+  }
+  if (!started) showLogin((acc) => startAccount(acc === 'demo' ? 'demo' : acc.id));
+  if (new URLSearchParams(location.search).has('demo') && !started) {
+    document.querySelector('#login')?.remove();
+    startAccount('demo');
+  }
+  setTimeout(() => $('#splash')?.classList.add('gone'), 250);
+  setTimeout(() => $('#splash')?.remove(), 900);
+}
+
+boot().catch((e) => {
+  console.error(e);
+  err('Ошибка запуска', e);
+});
+export const _cs = CS;

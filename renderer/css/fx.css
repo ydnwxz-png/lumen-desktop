@@ -1,0 +1,148 @@
+/* Украшения ников Lumen FX — та же графика, что в расширении Lumen (content/inject.css). */
+/* ---------- украшения ников (Lumen FX) ---------- */
+.lm-fx { font-weight: 700; padding: .25em .4em !important; margin: -.25em -.4em !important; }
+/* свечению нужно место: контейнеры ника FunPay обрезают всё, что вылезает (overflow:hidden) — отсюда «квадрат» вокруг ника */
+.lm-fx-host { overflow: visible !important; }
+html .lm-fx.lm-fx.lm-fx-f-solid, html .lm-fx.lm-fx.lm-fx-f-solid * { color: var(--fx1) !important; -webkit-text-fill-color: var(--fx1) !important; }
+html .lm-fx.lm-fx.lm-fx-f-grad, html .lm-fx.lm-fx.lm-fx-f-flow { background-image: linear-gradient(90deg, var(--fx1), var(--fx2), var(--fx3)) !important; -webkit-background-clip: text !important; background-clip: text !important; -webkit-text-fill-color: transparent !important; }
+html .lm-fx.lm-fx.lm-fx-f-grad *, html .lm-fx.lm-fx.lm-fx-f-flow * { -webkit-text-fill-color: transparent !important; }
+html .lm-fx.lm-fx.lm-fx-f-flow { background-image: linear-gradient(90deg, var(--fx1), var(--fx2), var(--fx3), var(--fx1)) !important; background-size: 300% 100% !important; animation: lmfx-flow calc(5s / var(--fxs)) linear infinite; }
+@keyframes lmfx-flow { to { background-position: 300% 0; } }
+/* тонкий контур под цвет фона: светлые цвета ника не пропадают на белом, тёмные — на чёрном */
+.lm-fx-sm { --fxg: .55; }   /* мелкие ники (таблицы, чат) — свечение слабее, чтобы буквы не расплывались */
+.lm-fx-onlight { --fxedge: drop-shadow(0 0 .8px rgba(0,0,0,.5)); }
+.lm-fx-ondark { --fxedge: drop-shadow(0 0 1px rgba(255,255,255,.18)); }
+html .lm-fx.lm-fx { filter: var(--fxedge, none); }
+html .lm-fx.lm-fx.lm-fx-t-glow { filter: var(--fxedge,) drop-shadow(0 0 calc(4px * min(var(--fxz), 1.3) * var(--fxg, 1)) var(--fx1a)); }
+html .lm-fx.lm-fx.lm-fx-t-neon { filter: var(--fxedge,) drop-shadow(0 0 calc(2px * min(var(--fxz), 1.3) * var(--fxg, 1)) var(--fx1)) drop-shadow(0 0 calc(5px * min(var(--fxz), 1.3) * var(--fxg, 1)) var(--fx2a)); animation: lmfx-neon calc(2s / var(--fxs)) ease-in-out infinite; }
+@keyframes lmfx-neon { 50% { filter: var(--fxedge,) drop-shadow(0 0 1px var(--fx1)) drop-shadow(0 0 2px var(--fx2a)); } }
+html .lm-fx.lm-fx.lm-fx-f-solid.lm-fx-t-shine { background-image: linear-gradient(110deg, var(--fx1) 0%, var(--fx1) 40%, #fff 50%, var(--fx1) 60%, var(--fx1) 100%) !important; background-size: 250% 100% !important; -webkit-background-clip: text !important; background-clip: text !important; -webkit-text-fill-color: transparent !important; animation: lmfx-shine calc(2.8s / var(--fxs)) ease-in-out infinite; }
+html .lm-fx.lm-fx.lm-fx-f-solid.lm-fx-t-shine * { -webkit-text-fill-color: transparent !important; }
+@keyframes lmfx-shine { 0% { background-position: 150% 0; } 100% { background-position: -100% 0; } }
+html .lm-fx.lm-fx-t-pulse { display: inline-block; animation: lmfx-pulse calc(1.6s / var(--fxs)) ease-in-out infinite; }
+@keyframes lmfx-pulse { 50% { transform: scale(calc(1 + .05 * min(var(--fxz), 1.3))); } }
+html .lm-fx.lm-fx-t-wave { display: inline-block; animation: lmfx-wave calc(1.8s / var(--fxs)) ease-in-out infinite; }
+@keyframes lmfx-wave { 25% { transform: translateY(calc(-1.5px * min(var(--fxz), 1.3))); } 75% { transform: translateY(calc(1.5px * min(var(--fxz), 1.3))); } }
+html .lm-fx.lm-fx-t-glitch { animation: lmfx-glitch calc(2.4s / var(--fxs)) steps(1) infinite; }
+@keyframes lmfx-glitch { 0%, 86% { transform: none; text-shadow: none; } 88% { transform: translate(-2px, 1px); text-shadow: 2px 0 #ff2bd6, -2px 0 #2bf0ff; } 92% { transform: translate(2px, -1px); text-shadow: -2px 0 #ff2bd6, 2px 0 #2bf0ff; } }
+/* новые заливки и эффекты */
+html .lm-fx.lm-fx.lm-fx-f-rainbow, html .lm-fx.lm-fx.lm-fx-f-metal { -webkit-background-clip: text !important; background-clip: text !important; -webkit-text-fill-color: transparent !important; }
+html .lm-fx.lm-fx.lm-fx-f-rainbow *, html .lm-fx.lm-fx.lm-fx-f-metal * { -webkit-text-fill-color: transparent !important; }
+html .lm-fx.lm-fx.lm-fx-f-rainbow { background-image: linear-gradient(90deg, #ff4d4d, #ffb84d, #fff24d, #4dff88, #4dd2ff, #7a5cff, #ff4dd8, #ff4d4d) !important; background-size: 300% 100% !important; animation: lmfx-flow calc(4s / var(--fxs)) linear infinite; }
+html .lm-fx.lm-fx.lm-fx-f-metal { background-image: linear-gradient(180deg, var(--fx3) 0%, var(--fx1) 42%, var(--fx2) 50%, var(--fx1) 58%, var(--fx3) 100%) !important; }
+html .lm-fx.lm-fx.lm-fx-t-flicker { filter: var(--fxedge,) drop-shadow(0 0 calc(3px * min(var(--fxz), 1.3) * var(--fxg, 1)) var(--fx1a)); animation: lmfx-flicker calc(3s / var(--fxs)) linear infinite; }
+@keyframes lmfx-flicker { 0%, 18%, 22%, 25%, 53%, 57%, 100% { opacity: 1; } 20%, 24%, 55% { opacity: .35; } }
+html .lm-fx.lm-fx.lm-fx-t-hue { animation: lmfx-hue calc(6s / var(--fxs)) linear infinite; }
+@keyframes lmfx-hue { from { filter: var(--fxedge,) hue-rotate(0deg); } to { filter: var(--fxedge,) hue-rotate(360deg); } }
+html .lm-fx.lm-fx-t-float { display: inline-block; animation: lmfx-float calc(3.2s / var(--fxs)) ease-in-out infinite; }
+@keyframes lmfx-float { 0%, 100% { transform: translateY(calc(1px * min(var(--fxz), 1.3))) rotate(-1deg); } 50% { transform: translateY(calc(-2.5px * min(var(--fxz), 1.3))) rotate(1deg); } }
+html .lm-fx.lm-fx.lm-fx-t-breath { animation: lmfx-breath calc(2.6s / var(--fxs)) ease-in-out infinite; }
+@keyframes lmfx-breath { 0%, 100% { filter: var(--fxedge,) drop-shadow(0 0 calc(1px * min(var(--fxz), 1.3) * var(--fxg, 1)) var(--fx1a)); } 50% { filter: var(--fxedge,) drop-shadow(0 0 calc(7px * min(var(--fxz), 1.3) * var(--fxg, 1)) var(--fx1a)) drop-shadow(0 0 calc(3px * min(var(--fxz), 1.3) * var(--fxg, 1)) var(--fx2a)); } }
+.lm-fx-layer { position: fixed !important; left: 0 !important; top: 0 !important; width: 100vw !important; height: 100vh !important; pointer-events: none !important; z-index: 2147480000 !important; margin: 0 !important; border: 0 !important; background: none !important; }
+.lm-fx-still .lm-fx, .lm-fx-still .lm-fx * { animation: none !important; }
+
+/* ---------- украшения вокруг ника: плашка, значки, маскот, подпись, рамка аватарки, подсветка лотов ---------- */
+/* текстовый градиент каждой заливки — чтобы под ним можно было положить плашку вторым слоем */
+.lm-fx-f-grad { --fxtg: linear-gradient(90deg, var(--fx1), var(--fx2), var(--fx3)); }
+.lm-fx-f-flow { --fxtg: linear-gradient(90deg, var(--fx1), var(--fx2), var(--fx3), var(--fx1)); --fxts: 300% 100%; }
+.lm-fx-f-rainbow { --fxtg: linear-gradient(90deg, #ff4d4d, #ffb84d, #fff24d, #4dff88, #4dd2ff, #7a5cff, #ff4dd8, #ff4d4d); --fxts: 300% 100%; }
+.lm-fx-f-metal { --fxtg: linear-gradient(180deg, var(--fx3) 0%, var(--fx1) 42%, var(--fx2) 50%, var(--fx1) 58%, var(--fx3) 100%); }
+.lm-fx-f-solid.lm-fx-t-shine { --fxtg: linear-gradient(110deg, var(--fx1) 0%, var(--fx1) 40%, #fff 50%, var(--fx1) 60%, var(--fx1) 100%); --fxts: 250% 100%; }
+.lm-pl-own { --plbg: linear-gradient(90deg, color-mix(in srgb, var(--fx1) 30%, #0d0f16), color-mix(in srgb, var(--fx2) 30%, #0d0f16)); --plbd: color-mix(in srgb, var(--fx1) 70%, transparent); }
+.lm-pl-aurora { --plbg: linear-gradient(90deg, #0e5a52, #1a6b4e 45%, #33297a); --plbd: #5ef0c8aa; }
+.lm-pl-fire { --plbg: linear-gradient(90deg, #6a1a06, #8a3207 50%, #5c0b1c); --plbd: #ff7a2faa; }
+.lm-pl-night { --plbg: linear-gradient(90deg, #0b1030, #1b1452 55%, #0b1030); --plbd: #6c7cffaa; }
+.lm-pl-gold { --plbg: linear-gradient(90deg, #4a3408, #6b4e12 50%, #4a3408); --plbd: #ffd36aaa; }
+.lm-pl-ice { --plbg: linear-gradient(90deg, #0b2f4d, #145079 50%, #0b2f4d); --plbd: #8fdcffaa; }
+.lm-pl-candy { --plbg: linear-gradient(90deg, #5a1046, #5e1c78 50%, #5a1046); --plbd: #ff8fd8aa; }
+html .lm-fx.lm-fx.lm-fx-pl.lm-fx-pl { border-radius: 999px !important; box-shadow: inset 0 0 0 1px var(--plbd), 0 0 12px -3px var(--plbd) !important; background-image: var(--fxtg), var(--plbg) !important; -webkit-background-clip: text, padding-box !important; background-clip: text, padding-box !important; background-size: var(--fxts, 100% 100%), 100% 100% !important; background-repeat: repeat, no-repeat !important; -webkit-text-fill-color: transparent !important; }
+html .lm-fx.lm-fx.lm-fx-pl.lm-fx-pl * { -webkit-text-fill-color: transparent !important; }
+/* однотонная — текст обычным цветом, плашка просто фоном */
+html .lm-fx.lm-fx.lm-fx-pl.lm-fx-pl.lm-fx-f-solid:not(.lm-fx-t-shine) { background-image: var(--plbg) !important; -webkit-background-clip: padding-box !important; background-clip: padding-box !important; background-size: 100% 100% !important; -webkit-text-fill-color: var(--fx1) !important; }
+html .lm-fx.lm-fx.lm-fx-pl.lm-fx-pl.lm-fx-f-solid:not(.lm-fx-t-shine) * { -webkit-text-fill-color: var(--fx1) !important; }
+html .lm-fx.lm-fx.lm-fx-pl { display: inline-block !important; width: auto !important; max-width: 100%; box-sizing: border-box; vertical-align: middle; line-height: 1.3 !important; margin: 1px 0 !important; padding: .08em .55em !important; --fxg: .35; }
+html .lm-fx.lm-fx.lm-fx-pl.lm-fx-pl { box-shadow: inset 0 0 0 1px var(--plbd) !important; }
+@supports (text-box: trim-both cap alphabetic) {
+  html .lm-fx.lm-fx.lm-fx-pl { text-box: trim-both cap alphabetic; padding: .36em .62em !important; line-height: 1.2 !important; }
+  html .lm-fx.lm-fx.lm-fx-pl.lm-pl-x { text-box: trim-both ex alphabetic; padding: .42em .62em !important; }   /* ник только из строчных без «хвостов» вверх: noonems */
+}
+/* светлый фон FunPay — плашки светлые пастельные, без тёмного «пятна» и мутного свечения */
+.lm-fx-onlight.lm-pl-own { --plbg: linear-gradient(90deg, color-mix(in srgb, var(--fx1) 16%, #fff), color-mix(in srgb, var(--fx2) 16%, #fff)); --plbd: color-mix(in srgb, var(--fx1) 55%, transparent); }
+.lm-fx-onlight.lm-pl-aurora { --plbg: linear-gradient(90deg, #dcf7ef, #e3f4e9 45%, #e7e3fb); --plbd: #3fc9a3aa; }
+.lm-fx-onlight.lm-pl-fire { --plbg: linear-gradient(90deg, #ffe8dc, #fff0de 50%, #ffe1e7); --plbd: #ff7a2f99; }
+.lm-fx-onlight.lm-pl-night { --plbg: linear-gradient(90deg, #e4e7fb, #ebe5fc 55%, #e4e7fb); --plbd: #6c7cff99; }
+.lm-fx-onlight.lm-pl-gold { --plbg: linear-gradient(90deg, #fff4d6, #fff9e6 50%, #fff4d6); --plbd: #d9a44199; }
+.lm-fx-onlight.lm-pl-ice { --plbg: linear-gradient(90deg, #e0f2ff, #eaf7ff 50%, #e0f2ff); --plbd: #4fb6ef99; }
+.lm-fx-onlight.lm-pl-candy { --plbg: linear-gradient(90deg, #ffe4f3, #f6e6ff 50%, #ffe4f3); --plbd: #ff6fc499; }
+html .lm-fx.lm-fx.lm-fx-pl.lm-fx-onlight { --fxg: .15; }
+/* на светлой плашке светлые цвета ника темнеют на четверть — текст читается */
+.lm-fx-onlight.lm-fx-pl { --fxd1: color-mix(in srgb, var(--fx1) 72%, #000); --fxd2: color-mix(in srgb, var(--fx2) 72%, #000); --fxd3: color-mix(in srgb, var(--fx3) 72%, #000); }
+.lm-fx-onlight.lm-fx-pl.lm-fx-f-grad { --fxtg: linear-gradient(90deg, var(--fxd1), var(--fxd2), var(--fxd3)); }
+.lm-fx-onlight.lm-fx-pl.lm-fx-f-flow { --fxtg: linear-gradient(90deg, var(--fxd1), var(--fxd2), var(--fxd3), var(--fxd1)); }
+.lm-fx-onlight.lm-fx-pl.lm-fx-f-metal { --fxtg: linear-gradient(180deg, var(--fxd3) 0%, var(--fxd1) 42%, var(--fxd2) 50%, var(--fxd1) 58%, var(--fxd3) 100%); }
+.lm-fx-onlight.lm-fx-pl.lm-fx-f-solid.lm-fx-t-shine { --fxtg: linear-gradient(110deg, var(--fxd1) 0%, var(--fxd1) 40%, #fff 50%, var(--fxd1) 60%, var(--fxd1) 100%); }
+html .lm-fx.lm-fx.lm-fx-pl.lm-fx-pl.lm-fx-onlight.lm-fx-f-solid:not(.lm-fx-t-shine), html .lm-fx.lm-fx.lm-fx-pl.lm-fx-pl.lm-fx-onlight.lm-fx-f-solid:not(.lm-fx-t-shine) * { -webkit-text-fill-color: var(--fxd1) !important; }
+
+
+/* значки и маскот — сразу после ника */
+.lm-deco { display: inline-flex !important; align-items: center; gap: .22em; margin-left: .4em; vertical-align: -.2em; line-height: 1; flex: none; pointer-events: auto; }
+.lm-deco svg { display: block; width: 1.08em; height: 1.08em; overflow: visible; }
+.lm-deco .lm-bdg-rare svg { animation: lmb-rare 2.6s ease-in-out infinite; }
+@keyframes lmb-rare { 0%, 100% { filter: drop-shadow(0 0 0 transparent) brightness(1); } 50% { filter: drop-shadow(0 0 3px rgba(255, 215, 120, .8)) brightness(1.15); } }
+.lm-deco .lm-msc svg { width: 1.45em; height: 1.45em; margin: -.25em 0 -.2em; }
+.lm-deco i { display: inline-flex; font-style: normal; }
+.lm-msc .m-eye { transform-box: fill-box; transform-origin: center; animation: lmm-blink 4.2s infinite; }
+@keyframes lmm-blink { 0%, 93%, 100% { transform: scaleY(1); } 96% { transform: scaleY(.12); } }
+.lm-m-cat .m-paw { transform-box: fill-box; transform-origin: 30% 100%; animation: lmm-wave 2.6s ease-in-out infinite; }
+@keyframes lmm-wave { 0%, 45%, 100% { transform: rotate(0); } 10%, 30% { transform: rotate(-24deg); } 20%, 40% { transform: rotate(8deg); } }
+.lm-m-cat .m-body, .lm-m-dragon .m-body { transform-box: fill-box; transform-origin: 50% 100%; animation: lmm-breath 3s ease-in-out infinite; }
+@keyframes lmm-breath { 50% { transform: scale(1.03, .97); } }
+.lm-m-dragon .m-paw { transform-box: fill-box; transform-origin: 0% 100%; animation: lmm-flap 1.4s ease-in-out infinite; }
+@keyframes lmm-flap { 50% { transform: rotate(-22deg) scaleY(.8); } }
+.lm-m-ghost .m-body { animation: lmm-float 2.8s ease-in-out infinite; }
+@keyframes lmm-float { 0%, 100% { transform: translateY(1px) rotate(-3deg); } 50% { transform: translateY(-2.5px) rotate(3deg); } }
+.lm-m-slime .m-body { transform-box: fill-box; transform-origin: 50% 100%; animation: lmm-squish 1.9s ease-in-out infinite; }
+@keyframes lmm-squish { 0%, 100% { transform: scale(1, 1); } 40% { transform: scale(1.08, .9); } 70% { transform: scale(.95, 1.06); } }
+
+/* подпись под ником: цветная плашка в цвет ника — видна и в профиле, и в списке лотов */
+.lm-sig { display: flex !important; align-items: center; gap: .4em; width: fit-content; max-width: 100%; box-sizing: border-box; margin: 4px 0 3px; padding: .18em .65em .18em .5em; border-radius: 999px;
+  font-size: 12px; font-weight: 700; line-height: 1.35; letter-spacing: .01em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  color: color-mix(in srgb, var(--fx1) 72%, #fff) !important; -webkit-text-fill-color: currentColor !important;
+  background: linear-gradient(90deg, color-mix(in srgb, var(--fx1) 22%, transparent), color-mix(in srgb, var(--fx2) 12%, transparent)) !important;
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--fx1) 45%, transparent); }
+.lm-sig::before { content: ''; flex: none; width: .45em; height: .45em; border-radius: 50%; background: var(--fx1); box-shadow: 0 0 6px var(--fx1); }
+.lm-sig-onlight { color: color-mix(in srgb, var(--fx1) 65%, #000) !important; }
+.lm-sig-big { font-size: 14px; margin: 8px 0 14px; padding: .25em .8em .25em .6em; }
+
+/* рамка аватарки: градиентное кольцо = рамка самой аватарки (фото внутри, цвет — в рамке).
+   Кольцо всегда ровное и круглое, ничего не вылезает; цвета медленно перетекают по кругу */
+@property --fra { syntax: '<angle>'; inherits: false; initial-value: 0deg; }
+html .lm-fr.lm-fr { box-sizing: border-box !important; border-radius: 50% !important; border: var(--frw) solid transparent !important;
+  background-image: var(--frimg, linear-gradient(#2a2d36, #2a2d36)), conic-gradient(from var(--fra), var(--frc)) !important;
+  background-origin: padding-box, border-box !important; background-clip: padding-box, border-box !important;
+  background-size: cover, 100% 100% !important; background-position: center, center !important; background-repeat: no-repeat !important;
+  box-shadow: 0 0 calc(var(--frw) * 3.5) calc(var(--frw) * -.6) var(--frglow) !important; animation: lmfr-flow 6s linear infinite; }
+html img.lm-fr.lm-fr { background-image: linear-gradient(#2a2d36, #2a2d36), conic-gradient(from var(--fra), var(--frc)) !important; object-fit: cover; }
+@keyframes lmfr-flow { to { --fra: 360deg; } }
+.lm-fr-own { --frc: var(--fx1), var(--fx2), var(--fx3), var(--fx2), var(--fx1); --frglow: var(--fx1a); }
+.lm-fr-fire { --frc: #ff3d00, #ff8a1f, #ffd36a, #fff2c2, #ff8a1f, #ff3d00; --frglow: #ff6a00aa; }
+.lm-fr-neon { --frc: #00e5ff, #4f7cff, #a25cff, #ff2bd6, #a25cff, #00e5ff; --frglow: #3fd2ffaa; }
+.lm-fr-snow { --frc: #ffffff, #cfeeff, #8fd3ff, #ffffff, #b8e2ff, #ffffff; --frglow: #bfe6ffcc; }
+.lm-fr-rainbow { --frc: #ff4d4d, #ffb84d, #fff24d, #4dff88, #4dd2ff, #7a5cff, #ff4dd8, #ff4d4d; --frglow: #ff4dd877; }
+.lm-fr-gold { --frc: #a8761c, #ffe9a8, #d9a441, #fff6d8, #c08a2a, #a8761c; --frglow: #ffcc5c99; }
+
+
+/* в приложении: ник с украшением не обрезается по краям, свечению есть место */
+:is(.ci-top, .grp-name, .chat-head .nm, .prof-name, .ci-name):has(.lm-fx) { overflow: visible !important; }
+.chat-head .nm .lm-fx, .ci-top .lm-fx { margin-top: -.25em !important; margin-bottom: -.25em !important; }
+.av.lm-fr > img { border-radius: 50%; }
+
+/* шапка чата: ник, значки и подпись — одной строкой, шапка не растёт */
+.chat-head .nm:has(.lm-fx) { display: flex; align-items: center; gap: 0; min-width: 0; white-space: nowrap; }
+.chat-head .nm .lm-fx { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.chat-head .nm .lm-deco, .chat-head .nm .lm-sig { flex: none; }
+.lm-sig.lm-sig-inline { display: inline-flex !important; margin: 0 0 0 8px; padding: .1em .6em .1em .45em; font-size: 11px; }
+.chat-head .who { max-height: 56px; }
+/* список чатов: украшенный ник по ширине текста, время — справа */
+.ci-top .ci-name.lm-fx { flex: 0 1 auto; }
+.ci-top:has(.lm-fx) .ci-time { margin-left: auto; }

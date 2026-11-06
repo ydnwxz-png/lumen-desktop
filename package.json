@@ -1,0 +1,82 @@
+{
+  "name": "lumen-desktop",
+  "productName": "Lumen",
+  "version": "1.6.0",
+  "description": "Lumen — красивый десктопный клиент FunPay: чаты, сделки, лоты, шаблоны",
+  "main": "main/main.js",
+  "author": "Lumen",
+  "license": "MIT",
+  "scripts": {
+    "start": "electron .",
+    "dist:win": "electron-builder --win",
+    "dist:mac": "electron-builder --mac",
+    "test": "node test/fp.test.js && node test/engine.test.mjs && node test/parse.node.test.mjs && node test/client.node.test.mjs"
+  },
+  "devDependencies": {
+    "electron": "^37.2.0",
+    "electron-builder": "^26.0.12"
+  },
+  "build": {
+    "appId": "online.lumenfp.desktop",
+    "productName": "Lumen",
+    "files": [
+      "main/**",
+      "renderer/**",
+      "engine/**",
+      "assets/**",
+      "package.json"
+    ],
+    "win": {
+      "icon": "assets/icon.ico",
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        }
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "shortcutName": "Lumen",
+      "artifactName": "Lumen-Setup-${version}.${ext}",
+      "deleteAppDataOnUninstall": false,
+      "createDesktopShortcut": true
+    },
+    "mac": {
+      "icon": "assets/icon.png",
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "x64",
+            "arm64"
+          ]
+        }
+      ],
+      "category": "public.app-category.social-networking",
+      "artifactName": "Lumen-${version}-${arch}.${ext}"
+    },
+    "linux": {
+      "target": [
+        "AppImage"
+      ],
+      "icon": "assets/icon.png"
+    },
+    "portable": {
+      "artifactName": "Lumen-Portable-${version}.${ext}"
+    }
+  },
+  "dependencies": {
+    "electron-updater": "^6.6.2",
+    "linkedom": "^0.18.0"
+  }
+}
