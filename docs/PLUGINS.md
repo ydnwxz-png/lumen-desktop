@@ -182,5 +182,3 @@ export default {
 | `lumen.fp.lotNewForm(node)` | Поля нового лота в разделе: `{ form, selects: [{ name, label, options }] }` |
 | `lumen.fp.lotCreate({ node, title:{ru,en}, desc:{ru,en}, price, amount, selects:{name:value} })` | Создать лот → `{ id, url }` |
 | `lumen.fp.withdrawRate()` | Курс вывода в USDT: `{ rate, fee, min }` |
-
-Пример готового плагина со страницей — `ps-topup.js` (калькулятор и создание лотов для пополнений PlayStation).

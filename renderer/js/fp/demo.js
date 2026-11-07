@@ -304,7 +304,7 @@ export function createDemo() {
     async lotCreate(f) {
       await wait(900);
       let g = myLots.find((x) => x.node === String(f.node));
-      if (!g) myLots.push((g = { node: String(f.node), name: 'PlayStation, Пополнение', url: '#', chips: false, lots: [] }));
+      if (!g) myLots.push((g = { node: String(f.node), name: 'Новый раздел', url: '#', chips: false, lots: [] }));
       const id = String(++lotId);
       g.lots.unshift({ id, node: g.node, title: f.title.ru, price: `${f.price} ₽`, priceNum: +f.price, unit: '₽', amount: String(f.amount), server: '', active: true, auto: false, url: `https://funpay.com/lots/offer?id=${id}` });
       return { id, url: `https://funpay.com/lots/offer?id=${id}` };
