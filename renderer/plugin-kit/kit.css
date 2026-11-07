@@ -6,6 +6,9 @@
 :root { --a1: #c6f432; --a2: #5ef0c8; --a-rgb: 150, 240, 110; --on-accent: #0b0b0d; --grad: linear-gradient(135deg, var(--a1), var(--a2));
   --text: #f4f4f5; --text-2: #b4b4bb; --text-3: #7c7c86; --surface: #151517; --surface-2: #1b1b1e; --surface-3: #232327; --line: rgba(255,255,255,.07); --line-2: rgba(255,255,255,.12);
   --hover: rgba(255,255,255,.05); --press: rgba(255,255,255,.08); --ok: #34d399; --bad: #f87171; --warn: #fbbf24; --info: #60a5fa; --r-lg: 18px; --t: .18s; --ease: cubic-bezier(.2,.8,.2,1); --spring: cubic-bezier(.34,1.4,.5,1); }
+/* та же схема цветов, что у окна Lumen — иначе Chromium рисует под страницей белый фон */
+:root { color-scheme: dark; }
+:root[data-theme='light'] { color-scheme: light; }
 * { box-sizing: border-box; }
 html, body { margin: 0; background: transparent; color: var(--text); font: 14px/1.45 'Inter', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Cambria Math', 'Apple Color Emoji', 'Noto Color Emoji', 'Noto Sans Math', 'Segoe UI', system-ui, -apple-system, sans-serif; -webkit-font-smoothing: antialiased; }
 body { padding: 26px 30px 40px; }

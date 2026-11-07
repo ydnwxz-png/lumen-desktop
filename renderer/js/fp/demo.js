@@ -293,8 +293,11 @@ export function createDemo() {
       return {
         form: [['node_id', String(node)], ['offer_id', '0'], ['fields[summary][ru]', ''], ['fields[summary][en]', ''], ['fields[desc][ru]', ''], ['fields[desc][en]', ''], ['price', ''], ['amount', '']],
         selects: [
-          { name: 'fields[type]', label: 'Тип пополнения', value: '', options: [{ value: '', text: 'Выберите…' }, { value: '1', text: 'С заходом на аккаунт' }, { value: '2', text: 'Кодом' }] },
-          { name: 'fields[currency]', label: 'Тип валюты', value: '', options: [{ value: '', text: 'Выберите…' }, { value: 'uah', text: 'UAH' }, { value: 'try', text: 'TRY' }, { value: 'inr', text: 'INR' }] },
+          { name: 'fields[type]', label: 'Тип пополнения', value: '', options: [{ value: '', text: '' }, { value: '1', text: 'С заходом на аккаунт' }, { value: '2', text: 'Кодом' }] },
+          { name: 'fields[country]', label: 'Страна', value: '', options: [{ value: '', text: '' }, { value: 'ua', text: 'Украина' }, { value: 'tr', text: 'Турция' }, { value: 'gb', text: 'Великобритания' }] },
+          { name: 'fields[gbp]', label: 'Количество GBP', value: '', options: [{ value: '', text: '' }, ...[5, 10, 20].map((n) => ({ value: 'g' + n, text: String(n) }))] },
+          { name: 'fields[uah]', label: 'Количество UAH', value: '', options: [{ value: '', text: '' }, ...[50, 100, 175, 250, 400, 600, 1000, 2000].map((n) => ({ value: 'u' + n, text: String(n) }))] },
+          { name: 'fields[try]', label: 'Количество TRY', value: '', options: [{ value: '', text: '' }, ...[100, 250, 500].map((n) => ({ value: 't' + n, text: String(n) }))] },
         ],
       };
     },
