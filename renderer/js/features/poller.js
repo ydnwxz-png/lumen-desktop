@@ -146,3 +146,6 @@ function incoming(c, isNew) {
   }
 }
 
+
+/** Чат, открытый (или последний открытый) во вкладке «Чаты». */
+export const openNode = () => provider().node;

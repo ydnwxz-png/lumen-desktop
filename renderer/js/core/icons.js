@@ -68,8 +68,11 @@ const P = {
   bot: '<rect x="4" y="8" width="16" height="12" rx="3"/><path d="M12 8V4"/><circle cx="12" cy="3.5" r="1"/><path d="M9 13h.01M15 13h.01"/><path d="M2 14v2M22 14v2"/>',
   filter: '<path d="M3 5h18l-7 8.5V19l-4 2v-7.5z"/>',
   play: '<path d="m7 4 13 8-13 8z"/>',
+  gamepad: '<path d="M6.5 7h11a4.5 4.5 0 0 1 4.4 5.5l-1 4.6a2.6 2.6 0 0 1-4.5 1.2L14.8 16H9.2l-1.6 2.3a2.6 2.6 0 0 1-4.5-1.2l-1-4.6A4.5 4.5 0 0 1 6.5 7z"/><path d="M7.5 10v4M5.5 12h4"/><path d="M15.5 11h.01M17.5 13h.01"/>',
+  calc: '<rect x="5" y="3" width="14" height="18" rx="2.5"/><path d="M8 7h8"/><path d="M8.5 11.5h.01M12 11.5h.01M15.5 11.5h.01M8.5 15h.01M12 15h.01M15.5 15h.01M8.5 18h.01M12 18h.01M15.5 18h.01"/>',
 };
 
+export const hasIcon = (name) => !!P[name];
 export function icon(name, size = 20, cls = '') {
   return `<svg class="ic ${cls}" width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${P[name] || ''}</svg>`;
 }

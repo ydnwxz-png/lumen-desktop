@@ -127,6 +127,7 @@ module.exports = {
     }
     return info();
   },
+  pageHtml: (id) => (cur ? cur.engine.plugins.pageHtml(id) : null),
   async raiseNow() {
     return need().raiseDue(true);
   },

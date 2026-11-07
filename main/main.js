@@ -1,4 +1,5 @@
-const { app, BrowserWindow, ipcMain, Tray, Menu, nativeImage, shell, Notification, screen, session, nativeTheme, clipboard } = require('electron');
+const { app, BrowserWindow, ipcMain, Tray, Menu, nativeImage, shell, Notification, screen, session, nativeTheme, clipboard, protocol } = require('electron');
+const fs = require('fs');
 const path = require('path');
 const store = require('./store');
 const { Session, cleanKey, UA } = require('./fp');
@@ -10,6 +11,8 @@ const ICON = path.join(ROOT, 'assets', process.platform === 'win32' ? 'icon.ico'
 const isMac = process.platform === 'darwin';
 
 app.setAppUserModelId('online.lumenfp.desktop');
+// Страницы плагинов открываются по адресу lumen-plugin://<id>/ — отдельно от окна приложения
+protocol.registerSchemesAsPrivileged([{ scheme: 'lumen-plugin', privileges: { standard: true, secure: true, supportFetchAPI: false } }]);
 const gotLock = app.requestSingleInstanceLock();
 if (!gotLock) app.quit();
 
@@ -165,6 +168,18 @@ handle('app:autostart', (on) => {
 handle('app:quit', () => {
   quitting = true;
   app.quit();
+});
+// Перевод RU → EN для лотов (бесплатный переводчик Google)
+handle('tr:en', async (text) => {
+  const r = await fetch('https://translate.googleapis.com/translate_a/single?client=gtx&sl=ru&tl=en&dt=t', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8' },
+    body: 'q=' + encodeURIComponent(String(text || '')),
+    signal: AbortSignal.timeout(20000),
+  });
+  if (!r.ok) throw new Error(`Переводчик не ответил (HTTP ${r.status})`);
+  const j = await r.json();
+  return (j?.[0] || []).map((x) => x?.[0] || '').join('');
 });
 handle('ai:chat', async (cfg, messages) => {
   const base = String(cfg.base || 'https://api.openai.com/v1').replace(/\/+$/, '');
@@ -451,8 +466,31 @@ app.on('web-contents-created', (_e, wc) => {
   });
 });
 app.on('second-instance', () => showMain());
+const PLUG_CSP = "default-src 'none'; script-src 'self' lumen-plugin: 'unsafe-inline'; style-src 'self' lumen-plugin: 'unsafe-inline'; img-src * data: blob:; font-src 'self' lumen-plugin: data:; media-src * data: blob:";
+const PLUG_KIT = { '/__lumen.js': ['renderer/plugin-kit/lumen.js', 'text/javascript'], '/__kit.css': ['renderer/plugin-kit/kit.css', 'text/css'] };
+function pluginPage(req) {
+  const u = new URL(req.url);
+  const res = (body, type, status = 200) => new Response(body, { status, headers: { 'content-type': type + '; charset=utf-8', 'content-security-policy': PLUG_CSP, 'cache-control': 'no-store' } });
+  const kit = PLUG_KIT[u.pathname];
+  if (kit) return res(fs.readFileSync(path.join(ROOT, kit[0])), kit[1]);
+  const font = /^\/fonts\/(Inter-[A-Za-z]+\.woff)$/.exec(u.pathname);
+  if (font) return new Response(fs.readFileSync(path.join(ROOT, 'assets', 'fonts', font[1])), { headers: { 'content-type': 'font/woff' } });
+  if (u.pathname !== '/' && u.pathname !== '/index.html') return res('Not found', 'text/plain', 404);
+  const html = automation.pageHtml(u.hostname);
+  if (html == null) return res('<!doctype html><link rel="stylesheet" href="/__kit.css"><p class="dim">Плагин выключен или не найден.</p>', 'text/html', 404);
+  const head = '<meta charset="utf-8"><link rel="stylesheet" href="/__kit.css"><script src="/__lumen.js"></script>';
+  return res(/<head[^>]*>/i.test(html) ? html.replace(/<head[^>]*>/i, (m) => m + head) : '<!doctype html><html><head>' + head + '</head><body>' + html + '</body></html>', 'text/html');
+}
+
 app.whenReady().then(() => {
   if (!gotLock) return;
+  protocol.handle('lumen-plugin', (req) => {
+    try {
+      return pluginPage(req);
+    } catch (e) {
+      return new Response(String(e.message || e), { status: 500 });
+    }
+  });
   // Скрытое меню только ради горячих клавиш: Ctrl+C / Ctrl+V / Ctrl+X / Ctrl+A / Ctrl+Z
   Menu.setApplicationMenu(
     Menu.buildFromTemplate([

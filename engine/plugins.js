@@ -65,12 +65,14 @@ export class Plugins {
         settings: Array.isArray(p.settings) ? p.settings.filter((s) => s && s.key) : [],
         commands: Object.keys(p.commands || {}),
         hooks: HOOKS.filter((h) => typeof p[h] === 'function'),
+        // своя страница в меню слева: page: { title, icon, html }
+        page: p.page && typeof p.page.html === 'string' ? { title: String(p.page.title || p.name || id), icon: String(p.page.icon || 'layers') } : null,
       };
       const entry = { id, file, plugin: p, meta, error: null, store: new Store(path.join(this.e.dir, 'plugins-data', id + '.json'), {}) };
       this.list.set(id, entry);
       return entry;
     } catch (err) {
-      const entry = { id: fallbackId, file, plugin: {}, meta: { name: file, version: '', author: '', description: '', settings: [], commands: [], hooks: [] }, error: err.message || String(err) };
+      const entry = { id: fallbackId, file, plugin: {}, meta: { name: file, version: '', author: '', description: '', settings: [], commands: [], hooks: [], page: null }, error: err.message || String(err) };
       this.list.set(fallbackId, entry);
       this.e.log('error', `Плагин ${file} не загрузился: ${entry.error}`);
       return entry;
@@ -113,6 +115,13 @@ export class Plugins {
         },
       },
     };
+  }
+
+  /** HTML страницы плагина (только у включённого). */
+  pageHtml(id) {
+    const p = this.list.get(id);
+    if (!p || !this.enabled(id) || typeof p.plugin.page?.html !== 'string') return null;
+    return p.plugin.page.html;
   }
 
   /** Вызвать обработчик у всех включённых плагинов. Ошибка одного не мешает остальным. */

@@ -50,11 +50,13 @@ async function refresh(calm = true) {
   } catch (e) {
     data = null;
   }
+  bus.emit('auto-info', data);
   render(calm);
 }
 
 function setData(d) {
   if (d) data = d;
+  bus.emit('auto-info', data);
   render(true);
 }
 

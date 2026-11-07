@@ -288,6 +288,28 @@ export function createDemo() {
       const l = myLots.flatMap((g) => g.lots).find((x) => x.id === lot.id);
       if (l) Object.assign(l, { priceNum: +price, price: `${price} ₽` });
     },
+    async lotNewForm(node) {
+      await wait(400);
+      return {
+        form: [['node_id', String(node)], ['offer_id', '0'], ['fields[summary][ru]', ''], ['fields[summary][en]', ''], ['fields[desc][ru]', ''], ['fields[desc][en]', ''], ['price', ''], ['amount', '']],
+        selects: [
+          { name: 'fields[type]', label: 'Тип пополнения', value: '', options: [{ value: '', text: 'Выберите…' }, { value: '1', text: 'С заходом на аккаунт' }, { value: '2', text: 'Кодом' }] },
+          { name: 'fields[currency]', label: 'Тип валюты', value: '', options: [{ value: '', text: 'Выберите…' }, { value: 'uah', text: 'UAH' }, { value: 'try', text: 'TRY' }, { value: 'inr', text: 'INR' }] },
+        ],
+      };
+    },
+    async lotCreate(f) {
+      await wait(900);
+      let g = myLots.find((x) => x.node === String(f.node));
+      if (!g) myLots.push((g = { node: String(f.node), name: 'PlayStation, Пополнение', url: '#', chips: false, lots: [] }));
+      const id = String(++lotId);
+      g.lots.unshift({ id, node: g.node, title: f.title.ru, price: `${f.price} ₽`, priceNum: +f.price, unit: '₽', amount: String(f.amount), server: '', active: true, auto: false, url: `https://funpay.com/lots/offer?id=${id}` });
+      return { id, url: `https://funpay.com/lots/offer?id=${id}` };
+    },
+    async withdrawRate() {
+      await wait(500);
+      return { rate: 80.12, fee: 6, min: 150, info: 'Комиссия 6%, но не менее 150 ₽, курс 80.12' };
+    },
     async openBrowser(url) {
       window.open(url || 'https://funpay.com/', '_blank');
     },

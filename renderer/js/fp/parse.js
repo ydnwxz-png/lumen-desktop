@@ -428,6 +428,37 @@ export function parseOfferForm(html) {
   return out;
 }
 
+/** Выпадающие списки формы нового лота с подписями: [{name, label, options:[{value,text}], value}] */
+export function parseOfferSelects(html) {
+  const d = doc(html);
+  const form = d.querySelector('form.form-offer-editor') || [...d.querySelectorAll('form')].find((f) => f.querySelector('[name=node_id]'));
+  if (!form) return [];
+  return [...form.querySelectorAll('select[name]')].map((e) => {
+    const g = e.closest('.form-group') || e.parentElement;
+    const label = squash(txt(g?.querySelector('label, .control-label')));
+    const options = [...e.querySelectorAll('option')].map((o) => ({ value: o.getAttribute('value') ?? o.textContent, text: squash(o.textContent) }));
+    const sel = [...e.querySelectorAll('option')].find((o) => o.hasAttribute('selected'));
+    return { name: e.getAttribute('name'), label, options, value: sel ? sel.getAttribute('value') ?? sel.textContent : options[0]?.value ?? '' };
+  });
+}
+
+/** Курс вывода в USDT (TRC20) со страницы баланса: { rate, fee, min, info } */
+export function parseWithdrawRate(html) {
+  const dec = String(html || '').replace(/&quot;|&#34;/g, '"').replace(/&amp;/g, '&');
+  for (const m of dec.matchAll(/\{[^{}]{10,800}\}/g)) {
+    const b = m[0];
+    if (!/usdt_trc/i.test(b) || !/feeInfo/.test(b)) continue;
+    const info = (/"feeInfo"\s*:\s*"([^"]*)"/.exec(b) || [])[1];
+    if (!info) continue;
+    const rate = parseFloat(((/курс\s+([\d.,]+)/i.exec(info) || [])[1] || '').replace(',', '.'));
+    if (!(rate > 10)) continue;
+    const fee = parseFloat((/Комиссия\s+([\d.,]+)\s*%/i.exec(info) || [])[1]?.replace(',', '.') || '0') || 0;
+    const min = parseFloat((/не менее\s+([\d.,]+)\s*₽/i.exec(info) || [])[1]?.replace(',', '.') || '0') || 0;
+    return { rate, fee, min, info: info.replace(/\\u([0-9a-f]{4})/gi, (_, h) => String.fromCharCode(parseInt(h, 16))) };
+  }
+  return null;
+}
+
 export function parseWait(msg) {
   const s = String(msg || '').toLowerCase();
   const n = +(/(\d+)/.exec(s) || [])[1] || 1;

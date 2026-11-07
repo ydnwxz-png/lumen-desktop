@@ -38,6 +38,7 @@ export default {
 | `onOrder(e)` | Новый заказ |
 | `onOrderStatus(e)` | Заказ закрыт или возвращён |
 | `onReview(e)` | Покупатель оставил или изменил отзыв |
+| `page` | Своя вкладка слева в меню: `{ title, icon, html }` — см. ниже |
 | `onDelivery(e)` | Автовыдача отправила товар |
 | `onTick(e)` | Раз в минуту |
 
@@ -132,3 +133,54 @@ await api.account.raiseGame(gameId, nodes)      // поднять
 ## Совет
 
 Плагин из FunPay Cardinal (Python) напрямую не подойдёт, но логику обычно легко перенести: обработчики там называются `BIND_TO_NEW_MESSAGE`, `BIND_TO_NEW_ORDER` и т.д. — у нас это `onMessage`, `onOrder`.
+
+
+---
+
+## Своя вкладка в меню (page)
+
+Плагин может показать свою страницу: у включённого плагина с полем `page` слева появляется кнопка.
+
+```js
+export default {
+  id: 'my-page',
+  name: 'Моя страница',
+  page: {
+    title: 'Моя страница',   // подсказка у кнопки
+    icon: 'calc',            // иконка Lumen (gamepad, calc, cash, box, star…) или эмодзи
+    html: `<h1>Привет!</h1>
+      <button class="btn pri" id="b">Курс вывода</button>
+      <script>
+        b.onclick = async () => {
+          const r = await lumen.fp.withdrawRate();
+          lumen.toast('Курс', r.rate + ' ₽ за USDT', 'ok');
+        };
+      </script>`,
+  },
+};
+```
+
+Страница открывается в отдельном окошке. Стили Lumen уже подключены: `.card`, `.btn`, `.btn.pri`, `.btn.sm`, `.input`, `.select`, `.textarea`, `.pill`, `.chip-btn`, `.tabs`, цвета `var(--a1)`, `var(--text)` и т. д. — они меняются вместе с темой.
+
+### window.lumen
+
+Все функции возвращают Promise.
+
+| Функция | Что делает |
+|---|---|
+| `lumen.me()` | `{ userId, username, balance }` |
+| `lumen.chats()` | Список чатов `[{ id, name, preview, unread, time }]` |
+| `lumen.openChat()` | Открытый сейчас чат `{ id, name }` или `null` |
+| `lumen.send(chatId, text)` | Отправить сообщение |
+| `lumen.toast(title, body, kind)` | Всплывашка; `kind`: `'ok'` / `'err'` / `''` |
+| `lumen.confirm(title, text, yes)` | Окно «Да / Отмена» → `true` / `false` |
+| `lumen.copy(text)` | Скопировать в буфер |
+| `lumen.open(url)` | Открыть ссылку (FunPay — внутри Lumen) |
+| `lumen.translate(text)` | Перевод RU → EN |
+| `lumen.storage.get(key, def)` / `.set(key, value)` | Сохранить данные страницы |
+| `lumen.fp.myLots()` | Свои лоты по разделам |
+| `lumen.fp.lotNewForm(node)` | Поля нового лота в разделе: `{ form, selects: [{ name, label, options }] }` |
+| `lumen.fp.lotCreate({ node, title:{ru,en}, desc:{ru,en}, price, amount, selects:{name:value} })` | Создать лот → `{ id, url }` |
+| `lumen.fp.withdrawRate()` | Курс вывода в USDT: `{ rate, fee, min }` |
+
+Пример готового плагина со страницей — `ps-topup.js` (калькулятор и создание лотов для пополнений PlayStation).

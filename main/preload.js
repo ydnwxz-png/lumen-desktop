@@ -45,6 +45,7 @@ contextBridge.exposeInMainWorld('api', {
     },
   },
   ai: (cfg, messages) => call('ai:chat', cfg, messages),
+  tr: (text) => call('tr:en', text),
   fx: { list: () => call('fx:list') },
   auto: {
     attach: (id, mode) => call('auto:attach', id, mode),

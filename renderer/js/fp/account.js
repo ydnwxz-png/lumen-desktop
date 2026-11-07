@@ -238,6 +238,51 @@ export function createAccount(transport, { accId = '' } = {}) {
       if (v.errors?.length) throw new Error(v.errors.map((e) => (Array.isArray(e) ? e.join(': ') : e)).join('; '));
       return v;
     },
+    /** Пустая форма нового лота в разделе node: { form: [[k,v]], selects: [...] } */
+    async lotNewForm(node) {
+      const r = await get(`/lots/offerEdit?node=${encodeURIComponent(node)}`);
+      if (r.status >= 400) throw new Error(`Форма лота не открылась (HTTP ${r.status})`);
+      const form = P.parseOfferForm(r.text);
+      if (!form) throw new Error('Форма лота не открылась — проверь, что вход в FunPay выполнен');
+      if (!form.some(([k]) => k === 'node_id')) form.push(['node_id', String(node)]);
+      return { form, selects: P.parseOfferSelects(r.text) };
+    },
+    /** Создать лот. f: {node, title:{ru,en}, desc:{ru,en}, price, amount, selects:{name:value}} → {id, url} */
+    async lotCreate(f) {
+      const { form } = await this.lotNewForm(f.node);
+      const idsBefore = new Set(((await this.myLots()).find((g) => g.node === String(f.node))?.lots || []).map((l) => l.id));
+      const set = (re, v, required) => {
+        const row = form.find(([k]) => re.test(k));
+        if (row) row[1] = String(v);
+        else if (required) throw new Error(`В форме FunPay нет поля «${required}» — похоже, FunPay поменял форму лота`);
+      };
+      set(/^offer_id$/, '0');
+      set(/summary\]\[ru\]$/, f.title.ru, 'название');
+      set(/summary\]\[en\]$/, f.title.en);
+      set(/desc\]\[ru\]$/, f.desc.ru);
+      set(/desc\]\[en\]$/, f.desc.en);
+      set(/^price$/, f.price, 'цена');
+      set(/^amount$/, f.amount);
+      for (const [k, v] of Object.entries(f.selects || {})) set(new RegExp('^' + k.replace(/[[\]]/g, '\\$&') + '$'), v);
+      const out = form.filter(([k]) => !(k === 'active' || k === 'deleted'));
+      out.push(['active', 'on']);
+      const v = await this.lotSave(out);
+      // ссылку на новый лот берём из списка своих лотов в этом разделе
+      for (let i = 0; i < 3; i++) {
+        const g = (await this.myLots()).find((x) => x.node === String(f.node));
+        const lot = g?.lots.find((l) => !idsBefore.has(l.id));
+        if (lot) return { id: lot.id, url: lot.url };
+        await new Promise((res) => setTimeout(res, 1200));
+      }
+      return { id: '', url: v.url ? this.url(v.url) : `https://funpay.com/lots/${f.node}/trade` };
+    },
+    async withdrawRate() {
+      const r = await get('/account/balance');
+      if (r.status >= 400) throw new Error(`Страница баланса не открылась (HTTP ${r.status})`);
+      const x = P.parseWithdrawRate(r.text);
+      if (!x) throw new Error('Не нашёл курс вывода в USDT TRC20 на странице баланса');
+      return x;
+    },
     async lotSetActive(lot, on) {
       let f = await this.lotForm(lot);
       f = f.filter(([k, v]) => !(k === 'active' && v !== ''));

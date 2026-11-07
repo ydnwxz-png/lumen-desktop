@@ -19,6 +19,7 @@ import { mountDeals, showDeals } from './views/deals.js';
 import { mountFinance, showFinance } from './views/finance.js';
 import { mountLots, showLots } from './views/lots.js';
 import { mountAutomation, showAutomation } from './views/automation.js';
+import { mountPluginPages, showPluginPage, syncPluginRail } from './features/plugpages.js';
 import { mountSettings, showSettings } from './views/settings.js';
 import { showLogin } from './views/login.js';
 import { openProfile } from './views/profile.js';
@@ -48,6 +49,7 @@ function shell() {
       <nav class="rail">
         <span class="rail-ind"></span>
         ${NAV.map(([id, n, ic]) => `<button class="rail-btn" data-nav="${id}" data-tip="${n}">${icon(ic, 22)}${id === 'chats' ? '<span class="badge hidden" data-unread></span>' : ''}</button>`).join('')}
+        <span class="rail-plugs" data-plugrail></span>
         <span class="rail-sp"></span>
         <button class="rail-btn" data-browser data-tip="FunPay в браузере">${icon('globe', 21)}</button>
         <button class="rail-btn" data-nav="settings" data-tip="Настройки">${icon('settings', 21)}</button>
@@ -58,6 +60,7 @@ function shell() {
         <section class="view" id="v-deals"></section>
         <section class="view" id="v-finance"></section>
         <section class="view" id="v-lots"></section>
+        <section class="view" id="v-plug"></section>
         <section class="view" id="v-auto"></section>
         <section class="view" id="v-settings"></section>
         <section class="view" id="v-error"></section>
@@ -69,6 +72,7 @@ function shell() {
   mountDeals($('#v-deals'));
   mountFinance($('#v-finance'));
   mountLots($('#v-lots'));
+  mountPluginPages($('#v-plug'));
   mountAutomation($('#v-auto'));
   mountSettings($('#v-settings'));
   $('.rail').onclick = (e) => {
@@ -100,7 +104,8 @@ export function go(view, sub) {
   if (!S.me && view !== 'error') return;
   closeWebPane();
   S.view = view;
-  $$('.view').forEach((v) => v.classList.toggle('on', v.id === 'v-' + view));
+  const sec = view.startsWith('plug:') ? 'plug' : view; // страницы плагинов живут в одной секции
+  $$('.view').forEach((v) => v.classList.toggle('on', v.id === 'v-' + sec));
   $$('.rail-btn[data-nav]').forEach((b) => b.classList.toggle('on', b.dataset.nav === view));
   moveInd();
   if (view === 'deals') showDeals();
@@ -108,6 +113,7 @@ export function go(view, sub) {
   if (view === 'lots') showLots();
   if (view === 'auto') showAutomation();
   if (view === 'settings') showSettings(sub);
+  if (sec === 'plug') showPluginPage(view.slice(5));
 }
 
 function renderMe() {
@@ -196,7 +202,8 @@ async function startAccount(id) {
   bus.emit('me');
   startPoll();
   loadLater();
-  if (!S.demo && window.api?.auto) window.api.auto.attach(id, S.settings.automation?.mode === 'pc' ? 'pc' : 'off').catch((e) => console.warn('автоматика:', e));
+  syncPluginRail(null);
+  if (!S.demo && window.api?.auto) window.api.auto.attach(id, S.settings.automation?.mode === 'pc' ? 'pc' : 'off').then(syncPluginRail, (e) => console.warn('автоматика:', e));
   resetRaise();
   go(S.view && S.view !== 'error' ? S.view : 'chats');
 }
