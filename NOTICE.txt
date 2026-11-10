@@ -1,5 +1,5 @@
-Lumen ported FunPay request/parsing logic from FunPay Tools Desktop:
-https://github.com/XaviersDev/FunPay-Desktop
+Parts of the FunPay request/parsing code are based on third-party code
+distributed under the MIT License:
 
 MIT License
 

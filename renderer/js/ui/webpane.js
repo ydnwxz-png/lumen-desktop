@@ -2,6 +2,7 @@
 import { el, esc } from '../core/util.js';
 import { icon } from '../core/icons.js';
 import { err } from './kit.js';
+import { supportFillScript } from '../features/support.js';
 
 let pane = null; // { box, wv, partition }
 
@@ -18,7 +19,7 @@ export function closeWebPane() {
 export const webPaneOpen = () => !!pane;
 
 /** Открыть ссылку FunPay во встроенной панели (с куками аккаунта). */
-export async function openWebPane(accId, url) {
+export async function openWebPane(accId, url, opts = {}) {
   url = url || 'https://funpay.com/';
   if (!isFp(url)) return window.api?.app.open(url);
   let prep;
@@ -29,6 +30,7 @@ export async function openWebPane(accId, url) {
   }
   document.querySelectorAll('.drawer [data-x], .modal-wrap .scrim').forEach((x) => x.click());
   if (pane && pane.partition === prep.partition) {
+    pane.fill = opts.fill || null;
     pane.wv.loadURL(url).catch(() => {});
     return;
   }
@@ -73,8 +75,22 @@ export async function openWebPane(accId, url) {
     if (b === 'ext') window.api?.app.open((wv.getURL && wv.getURL()) || url);
     if (b === 'close') closeWebPane();
   };
+  // автозаполнение формы поддержки: пробуем несколько раз — форма может дорисовываться скриптами
+  wv.addEventListener('dom-ready', () => {
+    const f = pane?.fill;
+    if (!f || !/support\.funpay\.com/.test(wv.getURL())) return;
+    let n = 0;
+    const tryFill = () => {
+      if (!pane || pane.fill !== f) return;
+      wv.executeJavaScript(supportFillScript(f)).then((ok) => {
+        if (ok) pane.fill = null;
+        else if (++n < 8) setTimeout(tryFill, 700);
+      }, () => {});
+    };
+    setTimeout(tryFill, 400);
+  });
   stage.append(box);
-  pane = { box, wv, partition: prep.partition };
+  pane = { box, wv, partition: prep.partition, fill: opts.fill || null };
 }
 
 // Esc (когда фокус не внутри страницы) и переход в другой раздел закрывают панель

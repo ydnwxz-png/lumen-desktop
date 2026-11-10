@@ -20,6 +20,7 @@ contextBridge.exposeInMainWorld('api', {
     req: (id, opts) => call('fp:req', id, opts),
     runner: (id, objects, request) => call('fp:runner', id, objects, request),
     upload: (id, url, file) => call('fp:upload', id, url, file),
+    support: (id, p) => call('fp:support', id, p),
   },
   store: {
     get: (k, d) => call('store:get', k, d),

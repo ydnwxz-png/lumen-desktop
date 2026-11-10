@@ -9,6 +9,17 @@ const NOT_KNOWN = 'FunPay не принял golden_key. Проверь, что �
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const FUNPAY_HOST = /^([a-z0-9-]+\.)*funpay\.com$/i;
+const SUPPORT = 'https://support.funpay.com';
+const SUPPORT_CAT = '1'; // «Подтверждение заказа»
+const escHtml = (t) => String(t).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
+
+/** Токен формы поддержки: <input name="ticket[_token]" value="..."> (атрибуты в любом порядке). */
+function parseSupportToken(html) {
+  const tag = /<input\b[^>]*name=["']ticket\[_token\]["'][^>]*>/i.exec(String(html || ''));
+  if (!tag) return '';
+  const v = /\bvalue=["']([^"']*)["']/i.exec(tag[0]);
+  return v ? decodeEntities(v[1]) : '';
+}
 
 function cleanKey(raw) {
   const s = String(raw || '');
@@ -82,6 +93,20 @@ function pairs(form) {
   return Object.entries(form).map(([k, v]) => [k, v == null ? '' : String(v)]);
 }
 
+function captureTo(jar, headers) {
+  const list = typeof headers.getSetCookie === 'function' ? headers.getSetCookie() : [];
+  for (const raw of list) {
+    const first = raw.split(';')[0];
+    const i = first.indexOf('=');
+    if (i <= 0) continue;
+    const name = first.slice(0, i).trim();
+    const value = first.slice(i + 1).trim();
+    const low = raw.toLowerCase();
+    if (!value || value === 'deleted' || low.includes('max-age=0') || low.includes('expires=thu, 01-jan-1970')) jar.delete(name);
+    else jar.set(name, value);
+  }
+}
+
 class Session {
   /**
    * @param {{gk:string, cookies?:Object, ua?:string}} acc
@@ -99,6 +124,8 @@ class Session {
     this.onCookies = opts.onCookies || (() => {});
     this.fetch = opts.fetch || globalThis.fetch;
     this.base = opts.base || BASE;
+    this.supportBase = opts.support || SUPPORT;
+    this.sjar = new Map(); // куки support.funpay.com — отдельно, чтобы их PHPSESSID не затёр сессию funpay.com
     this.queue = Promise.resolve();
   }
 
@@ -134,7 +161,8 @@ class Session {
     return parts.join('; ');
   }
 
-  capture(headers) {
+  capture(headers, jar) {
+    if (jar) return captureTo(jar, headers);
     const list = typeof headers.getSetCookie === 'function' ? headers.getSetCookie() : [];
     for (const raw of list) {
       const first = raw.split(';')[0];
@@ -343,6 +371,103 @@ class Session {
     return v;
   }
 
+  // ── Поддержка FunPay (support.funpay.com) ──
+  // Вход через SSO: funpay.com/support/sso → редирект на support.funpay.com, там своя сессия.
+  // Каждый хост получает только свои куки.
+  async _sfetch(method, url, body, referer) {
+    const sOrigin = new URL(this.supportBase).origin;
+    for (let hop = 0; hop < 8; hop++) {
+      const u = new URL(url);
+      const isSup = u.origin === sOrigin;
+      if (!isSup && !this.allowed(url)) throw new Error('Поддержка перенаправила на чужой сайт: ' + u.hostname);
+      const headers = {
+        'User-Agent': this.ua,
+        'Accept-Language': 'ru-RU,ru;q=0.9,en;q=0.8',
+        Cookie: isSup ? [...this.sjar].map(([k, v]) => `${k}=${v}`).join('; ') : this.cookieHeader(false),
+      };
+      if (referer) {
+        headers['X-Requested-With'] = 'XMLHttpRequest';
+        headers.Accept = 'application/json, text/javascript, */*; q=0.01';
+        headers.Origin = sOrigin;
+        headers.Referer = referer;
+      } else {
+        headers.Accept = 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8';
+      }
+      if (!headers.Cookie) delete headers.Cookie;
+      let res;
+      try {
+        res = await this.fetch(url, { method, headers, body: method === 'POST' ? body : undefined, redirect: 'manual', signal: AbortSignal.timeout(30000) });
+      } catch (e) {
+        throw new Error(netErr(e));
+      }
+      if (isSup) this.capture(res.headers, this.sjar);
+      else this.capture(res.headers);
+      if (res.status >= 300 && res.status < 400 && res.headers.get('location')) {
+        url = new URL(res.headers.get('location'), url).href;
+        method = 'GET';
+        body = undefined;
+        continue;
+      }
+      return { status: res.status, text: await res.text(), url };
+    }
+    throw new Error('Слишком много перенаправлений');
+  }
+
+  async _supportForm() {
+    const path = '/tickets/new/' + SUPPORT_CAT;
+    let r = await this._sfetch('GET', this.supportBase + path);
+    let token = parseSupportToken(r.text);
+    if (!token) {
+      // нет сессии поддержки — входим через funpay.com
+      r = await this._sfetch('GET', this.url('/support/sso?return_to=' + encodeURIComponent(path)));
+      token = parseSupportToken(r.text);
+      if (!token && !r.url.includes(path)) {
+        r = await this._sfetch('GET', this.supportBase + path);
+        token = parseSupportToken(r.text);
+      }
+    }
+    this.flush();
+    if (!token) throw new Error('Не удалось войти в поддержку FunPay. Открой support.funpay.com через «Браузер» один раз и попробуй снова.');
+    return token;
+  }
+
+  /** Обращение «Покупатель не подтвердил заказ». orders — номера без #. Возвращает номер тикета. */
+  async _supportTicket({ orders, text }) {
+    const ids = (orders || []).map((x) => String(x).replace(/^#/, '').trim()).filter((x) => /^[A-Z0-9]{6,12}$/i.test(x));
+    if (!ids.length) throw new Error('Нет номеров заказов');
+    const me = await this._auth(false);
+    const token = await this._supportForm();
+    const html = String(text || '')
+      .split(/\n/)
+      .map((l) => `<p>${escHtml(l) || '<br>'}</p>`)
+      .join('');
+    const form = new URLSearchParams([
+      ['ticket[fields][1]', me.username],
+      ['ticket[fields][2]', ids.join(', ')],
+      ['ticket[fields][3]', '2'],
+      ['ticket[fields][5]', '201'],
+      ['ticket[comment][body_html]', html],
+      ['ticket[comment][attachments]', ''],
+      ['ticket[_token]', token],
+    ]);
+    const r = await this._sfetch('POST', `${this.supportBase}/tickets/create/${SUPPORT_CAT}`, form, `${this.supportBase}/tickets/new/${SUPPORT_CAT}`);
+    let v = null;
+    try {
+      v = JSON.parse(r.text);
+    } catch {}
+    const link = v && v.action && v.action.url ? String(v.action.url) : '';
+    const id = (/\/tickets\/(\d+)/.exec(link) || [])[1] || '';
+    if (r.status >= 400 || !id) {
+      const e = v && (v.error || v.message || (v.errors && JSON.stringify(v.errors)));
+      throw new Error(e ? 'Поддержка: ' + String(e).slice(0, 200) : `Поддержка не приняла обращение (HTTP ${r.status})`);
+    }
+    return { id, url: new URL(link, this.supportBase).href, orders: ids };
+  }
+
+  supportTicket(p) {
+    return this.lock(() => this._supportTicket(p));
+  }
+
   auth(force = false) {
     return this.lock(() => this._auth(force));
   }
@@ -357,4 +482,4 @@ class Session {
   }
 }
 
-module.exports = { Session, cleanKey, parseMain, decodeEntities, UA, BASE, NOT_KNOWN };
+module.exports = { Session, cleanKey, parseMain, parseSupportToken, decodeEntities, UA, BASE, NOT_KNOWN };

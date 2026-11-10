@@ -1,4 +1,4 @@
-// Отложенные сообщения и режим «Не беспокоить» (как в FunPay Tools 4.5).
+// Отложенные сообщения и режим «Не беспокоить».
 import { S, bus, persist } from '../core/state.js';
 import { err, toast } from '../ui/kit.js';
 import { pollNow, CS } from './poller.js';
@@ -127,7 +127,7 @@ export async function dndIncoming(c) {
   const d = S.settings.dnd || {};
   if (!d.reply || !d.text || replied.has(c.id) || /^Покупатель|^FunPay/i.test(c.preview)) return;
   replied.add(c.id);
-  // ждём немного: если за это время ответил бот (Cardinal, Lumen FP) или автоматика — чат станет прочитанным,
+  // ждём немного: если за это время ответил бот или автоматика — чат станет прочитанным,
   // и тогда наш «я не на связи» не нужен (иначе покупатель получит два ответа)
   await new Promise((r) => setTimeout(r, 12000));
   if (!dndActive()) return replied.delete(c.id);

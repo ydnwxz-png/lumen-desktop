@@ -1,4 +1,4 @@
-// Разбор страниц FunPay (DOMParser). Селекторы сверены с FunPay Tools / FunPay Cardinal.
+// Разбор страниц FunPay (DOMParser).
 import { parseFpDate, stripZW } from '../core/util.js';
 
 const BASE = 'https://funpay.com';
@@ -468,7 +468,7 @@ export function parseWait(msg) {
   return 0;
 }
 
-// ---------------------------------------------------------------- поднятие (как в FunPay Tools 4.5 / Cardinal)
+// ---------------------------------------------------------------- поднятие
 
 /** Разделы на своей странице: [{node, game, title}] (кроме валюты /chips/). */
 export function parseRaiseGroups(html) {

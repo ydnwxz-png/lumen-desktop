@@ -132,7 +132,7 @@ await api.account.raiseGame(gameId, nodes)      // поднять
 
 ## Совет
 
-Плагин из FunPay Cardinal (Python) напрямую не подойдёт, но логику обычно легко перенести: обработчики там называются `BIND_TO_NEW_MESSAGE`, `BIND_TO_NEW_ORDER` и т.д. — у нас это `onMessage`, `onOrder`.
+Плагины для ботов на Python напрямую не подойдут, но логику обычно легко перенести: обработчик нового сообщения у нас `onMessage`, нового заказа — `onOrder`.
 
 
 ---

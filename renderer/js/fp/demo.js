@@ -6,17 +6,17 @@ const MIN = 60e3,
 const ME = { userId: '1000001', username: 'LumenSeller', avatar: '', balance: '12 480 ₽' };
 
 const lots = [
-  { cat: 'Telegram · Premium', node: '1004', items: [['Telegram Premium 1 месяц · вход в аккаунт', 249], ['Telegram Premium 12 месяцев · подарком', 2190], ['Звёзды Telegram · 100 ⭐', 159]] },
-  { cat: 'ChatGPT · Подписки', node: '2031', items: [['ChatGPT Plus 1 месяц · на ваш аккаунт', 1490], ['ChatGPT Plus · общий аккаунт · 30 дней', 590]] },
   { cat: 'Steam · Аренда аккаунтов', node: '3310', items: [['Аренда CS2 Prime · 2 часа · выдача сразу', 69], ['Аренда аккаунта с Rust · 3 часа', 119], ['Аренда GTA V · 2 часа', 79]] },
-  { cat: 'Discord · Nitro', node: '4120', items: [['Discord Nitro 1 месяц · подарочная ссылка', 399]] },
+  { cat: 'Roblox · Robux', node: '2031', items: [['800 Robux · через геймпасс', 349], ['1700 Robux · через геймпасс', 699], ['Аккаунт Roblox с петами Adopt Me', 450]] },
+  { cat: 'Brawl Stars · Гемы', node: '1004', items: [['170 гемов · вход через Supercell ID', 299], ['Brawl Pass · вход в аккаунт', 549]] },
+  { cat: 'Genshin Impact · Кристаллы', node: '4120', items: [['980 кристаллов · по UID', 899]] },
 ];
 
 const people = [
-  ['darkness21', 'Оплатил. Ключ ещё есть?'],
+  ['darkness21', 'Оплатил, жду данные 🙏'],
   ['sanych', 'спасибо, всё работает 🔥'],
   ['MoonWalker', 'А на 3 часа можно продлить?'],
-  ['Alina_K', 'Добрый вечер! Подписка придёт на этот аккаунт?'],
+  ['Alina_K', 'Добрый вечер! Робуксы долго идут?'],
   ['vitalya228', 'го скидку 😅'],
   ['FrostByte', 'Отзыв оставил, ещё приду'],
   ['NeoGamer', 'Норм, зашёл'],

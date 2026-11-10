@@ -82,6 +82,7 @@ handle('fp:req', (id, opts) => {
   if (!isFunpay(String(opts?.url || ''))) throw new Error('Запросы разрешены только к funpay.com');
   return sessionFor(id).request(opts);
 });
+handle('fp:support', (id, p) => sessionFor(id).supportTicket({ orders: p?.orders, text: p?.text }));
 handle('fp:runner', (id, objects, request) => sessionFor(id).runner(objects, request));
 handle('fp:upload', (id, url, file) => {
   if (!isFunpay(String(url))) throw new Error('Запросы разрешены только к funpay.com');

@@ -81,7 +81,7 @@ function handleChats(list) {
     const prev = known.get(c.id);
     if (!first && (prev === undefined || c.nodeMsg > prev)) {
       if (c.unread) fresh.push({ c, isNew: !seen.has(c.id) });
-      // сообщение уже прочитано в другом месте (бот FunPay Cardinal, телефон, сайт) — FunPay снял «непрочитано»,
+      // сообщение уже прочитано в другом месте (бот, телефон, сайт) — FunPay снял «непрочитано»,
       // но уведомить всё равно нужно: смотрим, кто написал
       else readElsewhere.push({ c, prev: prev || 0, isNew: !seen.has(c.id) });
     }

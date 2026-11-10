@@ -228,7 +228,7 @@ function notif(w) {
       row('Включить сейчас', 'Без звука и всплывашек. Быстро — через аватарку слева внизу', sw(d.on, (v) => (set(() => (v ? dndOn() : dndOff())), dndTick()))),
       row('По расписанию', 'Каждый день в эти часы', sw(d.schedule, (v) => (set((s) => ((s.dnd.schedule = v), (s.dnd.snoozeUntil = 0))), dndTick()))),
       row('Часы', '', span),
-      row('Отвечать покупателям', 'Один раз в чат. Если бот (Cardinal, Lumen FP) или автоматика уже ответили — не пишу', sw(d.reply, (v) => set((s) => (s.dnd.reply = v)))),
+      row('Отвечать покупателям', 'Один раз в чат. Если бот или автоматика уже ответили — не пишу', sw(d.reply, (v) => set((s) => (s.dnd.reply = v)))),
       tRow
     )
   );

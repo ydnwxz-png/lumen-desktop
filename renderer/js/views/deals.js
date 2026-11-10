@@ -4,6 +4,7 @@ import { icon } from '../core/icons.js';
 import { S, bus } from '../core/state.js';
 import { seg, modal } from '../ui/kit.js';
 import { openOrder } from './order.js';
+import { openSupportPicker } from '../features/support.js';
 
 const V = { kind: 'sales', state: '', q: '', items: [], next: '', loading: false, gen: 0 };
 let root;
@@ -12,6 +13,7 @@ export function mountDeals(c) {
   root = c;
   root.innerHTML = `<div class="page">
     <div class="page-head"><h1>Сделки</h1><span class="sub" data-sub></span><span class="grow"></span>
+      <button class="btn" data-support data-tip="Покупатель не подтвердил заказ — обращение в поддержку">${icon('alert', 16)}В поддержку</button>
       <button class="btn" data-stats-open>${icon('trend', 16)}Статистика</button>
       <div class="seg" data-kind><button data-v="sales">${icon('trend', 15)}Продажи</button><button data-v="purchases">${icon('bag', 15)}Покупки</button></div>
     </div>
@@ -30,6 +32,7 @@ export function mountDeals(c) {
   $('[data-q]', root).oninput = debounce((e) => ((V.q = e.target.value.trim().toLowerCase()), render()), 100);
   $('[data-reload]', root).onclick = () => load();
   $('[data-stats-open]', root).onclick = openStats;
+  $('[data-support]', root).onclick = openSupportPicker;
   bus.on('account', () => {
     V.gen++;
     V.items = [];
@@ -117,7 +120,7 @@ function render(appendOnly) {
 
 export const dealsFmt = fmtNum;
 
-// ---------------------------------------------------------------- статистика продаж (как в FunPay Tools 4.5)
+// ---------------------------------------------------------------- статистика продаж
 
 const PERIODS = [
   ['1', 'Сегодня'],
