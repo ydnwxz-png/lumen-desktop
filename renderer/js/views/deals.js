@@ -5,8 +5,13 @@ import { S, bus } from '../core/state.js';
 import { seg, modal } from '../ui/kit.js';
 import { openOrder } from './order.js';
 import { openSupportPicker } from '../features/support.js';
+import { openStats } from './stats.js';
 
-const V = { kind: 'sales', state: '', q: '', items: [], next: '', loading: false, gen: 0 };
+const V = { kind: 'sales', state: '', q: '', game: '', cat: '', items: [], next: '', loading: false, gen: 0 };
+// «Counter-Strike 2, Аккаунты» → игра «Counter-Strike 2», раздел «Аккаунты»
+const gsplit = (o) => String(o.game || '').split(/\s*(?:,|·)\s*/);
+const gameOf = (o) => gsplit(o)[0].trim();
+const catOf = (o) => gsplit(o).slice(1).join(', ').trim();
 let root;
 
 export function mountDeals(c) {
@@ -20,6 +25,8 @@ export function mountDeals(c) {
     <div class="stats stagger" data-stats></div>
     <div class="toolbar">
       <div class="seg" data-state><button data-v="">Все</button><button data-v="paid">Оплачены</button><button data-v="closed">Закрыты</button><button data-v="refunded">Возвраты</button></div>
+      <select class="select" data-game style="width:auto;max-width:210px;height:36px"></select>
+      <select class="select" data-cat style="width:auto;max-width:190px;height:36px" hidden></select>
       <span class="grow"></span>
       <label class="search">${icon('search', 16)}<input class="input" placeholder="Номер, покупатель, лот" data-q></label>
       <button class="ibtn" data-reload data-tip="Обновить">${icon('refresh', 18)}</button>
@@ -31,6 +38,8 @@ export function mountDeals(c) {
   seg($('[data-state]', root), V.state, (v) => ((V.state = v), load()));
   $('[data-q]', root).oninput = debounce((e) => ((V.q = e.target.value.trim().toLowerCase()), render()), 100);
   $('[data-reload]', root).onclick = () => load();
+  $('[data-game]', root).onchange = (e) => ((V.game = e.target.value), (V.cat = ''), render());
+  $('[data-cat]', root).onchange = (e) => ((V.cat = e.target.value), render());
   $('[data-stats-open]', root).onclick = openStats;
   $('[data-support]', root).onclick = openSupportPicker;
   bus.on('account', () => {
@@ -69,10 +78,26 @@ async function load(more = false) {
   }
 }
 
+// фильтры «Игра» и «Раздел» — из загруженных сделок (как на FunPay)
+function fillFilters() {
+  const gs = $('[data-game]', root);
+  const cs = $('[data-cat]', root);
+  const cnt = (arr) => arr.reduce((m, k) => (k && m.set(k, (m.get(k) || 0) + 1), m), new Map());
+  const games = [...cnt(V.items.map(gameOf))].sort((a, b) => b[1] - a[1]);
+  if (V.game && !games.some(([g]) => g === V.game)) V.game = '';
+  gs.innerHTML = `<option value="">Все игры</option>` + games.map(([g, n]) => `<option value="${esc(g)}" ${g === V.game ? 'selected' : ''}>${esc(g)} · ${n}</option>`).join('');
+  gs.hidden = games.length < 2 && !V.game;
+  const cats = V.game ? [...cnt(V.items.filter((o) => gameOf(o) === V.game).map(catOf))].sort((a, b) => b[1] - a[1]) : [];
+  if (V.cat && !cats.some(([c]) => c === V.cat)) V.cat = '';
+  cs.innerHTML = `<option value="">Все разделы</option>` + cats.map(([c, n]) => `<option value="${esc(c)}" ${c === V.cat ? 'selected' : ''}>${esc(c)} · ${n}</option>`).join('');
+  cs.hidden = cats.length < 2 && !V.cat;
+}
+
 const skeleton = () => Array.from({ length: 7 }, () => `<div class="tr"><div class="skel" style="height:12px;width:70px"></div><div class="col" style="gap:6px"><div class="skel" style="height:12px;width:70%"></div><div class="skel" style="height:10px;width:40%"></div></div><div class="skel" style="height:28px;width:120px;border-radius:99px"></div><div></div><div></div><div></div></div>`).join('');
 
 function render(appendOnly) {
-  const list = V.items.filter((o) => !V.q || [o.id, o.desc, o.game, o.peer].join(' ').toLowerCase().includes(V.q));
+  fillFilters();
+  const list = V.items.filter((o) => (!V.q || [o.id, o.desc, o.game, o.peer].join(' ').toLowerCase().includes(V.q)) && (!V.game || gameOf(o) === V.game) && (!V.cat || catOf(o) === V.cat));
   const tbl = $('[data-list]', root);
   const head = `<div class="tr th"><span>Заказ</span><span>Описание</span><span>${V.kind === 'sales' ? 'Покупатель' : 'Продавец'}</span><span>Сумма</span><span>Статус</span><span>Дата</span></div>`;
   tbl.innerHTML = list.length
@@ -89,7 +114,7 @@ function render(appendOnly) {
             <span class="dim" style="font-size:12.5px">${esc(o.date)}</span></div>`;
         })
         .join('')
-    : `<div class="empty" style="padding:60px"><div class="orb">${icon('bag', 30)}</div><h3>${V.q ? 'Ничего не нашлось' : 'Сделок нет'}</h3><p>${V.q ? 'Попробуй другой запрос' : 'Здесь появятся заказы'}</p></div>`;
+    : `<div class="empty" style="padding:60px"><div class="orb">${icon('bag', 30)}</div><h3>${V.q || V.game ? 'Ничего не нашлось' : 'Сделок нет'}</h3><p>${V.q || V.game ? (V.next ? 'Среди загруженных нет — нажми «Показать ещё» ниже' : 'Попробуй другой фильтр') : 'Здесь появятся заказы'}</p></div>`;
   tbl.onclick = (e) => {
     const r = e.target.closest('[data-id]');
     if (r) openOrder(r.dataset.id, { onChange: () => load() });
@@ -120,76 +145,3 @@ function render(appendOnly) {
 
 export const dealsFmt = fmtNum;
 
-// ---------------------------------------------------------------- статистика продаж
-
-const PERIODS = [
-  ['1', 'Сегодня'],
-  ['7', '7 дней'],
-  ['30', '30 дней'],
-  ['0', 'Всё время'],
-];
-
-function top(map) {
-  let best = null;
-  for (const [k, v] of map) if (!best || v > best[1]) best = [k, v];
-  return best;
-}
-
-export function salesStats(items, cutoff) {
-  const list = items.filter((t) => !cutoff || (parseFpDate(t.date)?.getTime() || 0) >= cutoff);
-  const st = { orders: list.length, closed: 0, pending: 0, refunds: 0, earned: 0, pendingSum: 0, max: 0, buyers: new Map(), goods: new Map(), games: new Map(), cur: '₽' };
-  for (const t of list) {
-    st.cur = t.currency || st.cur;
-    if (t.state === 'closed') (st.closed++, (st.earned += t.amount || 0));
-    else if (t.state === 'paid') (st.pending++, (st.pendingSum += t.amount || 0));
-    else st.refunds++;
-    if (t.state !== 'refunded') st.max = Math.max(st.max, t.amount || 0);
-    if (t.peer) st.buyers.set(t.peer, (st.buyers.get(t.peer) || 0) + 1);
-    if (t.desc) st.goods.set(t.desc, (st.goods.get(t.desc) || 0) + 1);
-    if (t.game) st.games.set(t.game, (st.games.get(t.game) || 0) + 1);
-  }
-  const paidN = st.closed + st.pending;
-  st.avg = paidN ? (st.earned + st.pendingSum) / paidN : 0;
-  return st;
-}
-
-function openStats() {
-  const m = modal(`<div style="padding:22px"><div class="row" style="margin-bottom:16px"><h3 class="grow" style="margin:0">Статистика продаж</h3><div class="seg" data-p>${PERIODS.map(([v, n]) => `<button data-v="${v}">${n}</button>`).join('')}</div><button class="ibtn" data-close>${icon('x', 18)}</button></div><div data-body></div></div>`, { wide: true });
-  const body = $('[data-body]', m.el);
-  let gen = 0;
-  const run = async (days) => {
-    const my = ++gen;
-    body.innerHTML = `<div class="empty" style="padding:50px"><div class="spinner"></div><p data-note>Загружаю продажи…</p></div>`;
-    const d = new Date();
-    d.setHours(0, 0, 0, 0);
-    const cutoff = days === '1' ? d.getTime() : days === '0' ? 0 : Date.now() - +days * 86400e3;
-    try {
-      const items = await S.backend.salesSince(cutoff, days === '0' ? 60 : 40, (n) => my === gen && $('[data-note]', body) && ($('[data-note]', body).textContent = `Загружено продаж: ${n}`));
-      if (my !== gen) return;
-      const st = salesStats(items, cutoff);
-      const c = st.cur;
-      const tb = top(st.buyers),
-        tg = top(st.goods),
-        tc = top(st.games);
-      const tile = (label, val, sub = '', wide = false, hero = false) => `<div class="stat ${hero ? 'hero' : ''}" style="${wide ? 'grid-column:span 2' : ''}"><div class="lbl">${label}</div><div class="val" style="${wide ? 'font-size:17px;margin-top:10px' : ''}">${val}</div>${sub ? `<div class="hint">${sub}</div>` : ''}</div>`;
-      body.innerHTML = st.orders
-        ? `<div class="stats stagger" style="grid-template-columns:repeat(4,1fr);margin:0">
-          ${tile('Заработано', `${fmtNum(st.earned)}<small>${esc(c)}</small>`, `${st.closed} ${plural(st.closed, 'закрытый заказ', 'закрытых заказа', 'закрытых заказов')}`, false, true)}
-          ${tile('Заказов', st.orders)}
-          ${tile('Средний чек', `${fmtNum(st.avg)}<small>${esc(c)}</small>`)}
-          ${tile('Ждут подтверждения', st.pending, st.pending ? `на ${fmtNum(st.pendingSum)} ${esc(c)}` : '')}
-          ${tile('Возвраты', st.refunds)}
-          ${tile('Покупателей', st.buyers.size)}
-          ${tile('Самая дорогая продажа', `${fmtNum(st.max)}<small>${esc(c)}</small>`, '', true)}
-          ${tile('Самый активный покупатель', tb ? esc(tb[0]) : '—', tb ? `${tb[1]} ${plural(tb[1], 'заказ', 'заказа', 'заказов')}` : '', true)}
-          ${tile('Популярный товар', tg ? esc(tg[0]) : '—', tg ? `${tg[1]} ${plural(tg[1], 'продажа', 'продажи', 'продаж')}` : '', true)}
-          ${tile('Популярная категория', tc ? esc(tc[0]) : '—', '', true)}
-        </div><div class="dim" style="font-size:12px;margin-top:12px">Посчитано по ${items.length} загруженным продажам</div>`
-        : `<div class="empty" style="padding:50px"><div class="orb">${icon('trend', 28)}</div><h3>Продаж за этот период нет</h3></div>`;
-    } catch (e) {
-      if (my === gen) body.innerHTML = `<div class="empty" style="padding:50px"><div class="orb" style="color:var(--bad)">${icon('alert', 28)}</div><h3>Не загрузилось</h3><p>${esc(e.message)}</p></div>`;
-    }
-  };
-  seg($('[data-p]', m.el), '30', run);
-  run('30');
-}

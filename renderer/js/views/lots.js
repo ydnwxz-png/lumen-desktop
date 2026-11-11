@@ -4,6 +4,8 @@ import { icon } from '../core/icons.js';
 import { S, bus, saveSettings } from '../core/state.js';
 import { err, ok, busy, toast, confirmBox, menu } from '../ui/kit.js';
 import { R, raiseNode, raiseDue, nextAt, syncAuto, stateOfNode } from '../features/raise.js';
+import { lotMenu, copyLotLink, copyLotTitle } from '../features/lotlink.js';
+import { openLotEditor } from './loteditor.js';
 
 const V = { cats: [], loaded: false, gen: 0 };
 let root, tick;
@@ -119,7 +121,7 @@ function render() {
       ${c.lots
         .map(
           (l) => `<div class="tr ${l.active ? '' : 'off'}" data-lot="${esc(l.id)}">
-        <div class="lot-t">${esc(l.title)}${l.server || l.auto ? `<small>${esc([l.server, l.auto ? '⚡ автовыдача' : ''].filter(Boolean).join(' · '))}</small>` : ''}</div>
+        <div class="lot-t" data-edit data-tip="Нажми — редактировать · правый клик — скопировать">${esc(l.title)}${l.server || l.auto ? `<small>${esc([l.server, l.auto ? '⚡ автовыдача' : ''].filter(Boolean).join(' · '))}</small>` : ''}</div>
         <span class="dim mono">${esc(l.amount || '—')}</span>
         <span class="price price-edit mono" data-price data-tip="Нажми, чтобы изменить">${esc(l.price)}</span>
         <button class="switch ${l.active ? 'on' : ''}" data-toggle></button>
@@ -130,6 +132,33 @@ function render() {
     list.append(card);
   }
   renderRaiseStates();
+  const lotOf = (row) => {
+    for (const c of V.cats) {
+      const l = c.lots.find((x) => x.id === row.dataset.lot);
+      if (l) return Object.assign(l, { chips: c.chips, catName: c.name });
+    }
+    return null;
+  };
+  const edit = (lot) =>
+    openLotEditor(lot, {
+      onSaved: (upd) => {
+        Object.assign(lot, upd);
+        render();
+      },
+    });
+  // правый клик по лоту: скопировать ссылку / название, редактировать
+  list.oncontextmenu = (e) => {
+    const row = e.target.closest('[data-lot]');
+    if (!row) return;
+    e.preventDefault();
+    const lot = lotOf(row);
+    if (!lot) return;
+    lotMenu(e.clientX, e.clientY, lot, [
+      '-',
+      { label: 'Редактировать', icon: 'edit', run: () => edit(lot) },
+      { label: 'Открыть лот', icon: 'external', run: () => S.backend.openBrowser(lot.url) },
+    ]);
+  };
   list.onclick = async (e) => {
     const t = e.target;
     const rb = t.closest('[data-raise]');
@@ -145,13 +174,18 @@ function render() {
     if (op) return S.backend.openBrowser(op.dataset.open);
     const row = t.closest('[data-lot]');
     if (!row) return;
-    const lot = V.cats.flatMap((c) => c.lots).find((l) => l.id === row.dataset.lot);
+    const lot = lotOf(row);
+    if (!lot) return;
+    if (t.closest('[data-edit]')) return edit(lot);
     const mb = t.closest('[data-more]');
     if (mb) {
       const r = mb.getBoundingClientRect();
       return menu(r.left - 190, r.bottom + 4, [
-        { label: 'Редактировать на FunPay', icon: 'edit', run: () => S.backend.openBrowser(`https://funpay.com/lots/offerEdit?offer=${lot.id}`) },
+        { label: 'Редактировать', icon: 'edit', run: () => edit(lot) },
+        { label: 'Скопировать ссылку', icon: 'link', run: () => copyLotLink(lot) },
+        { label: 'Скопировать название', icon: 'copy', run: () => copyLotTitle(lot) },
         { label: 'Открыть лот', icon: 'external', run: () => S.backend.openBrowser(lot.url) },
+        { label: 'Редактировать на сайте FunPay', icon: 'globe', run: () => S.backend.openBrowser(`https://funpay.com/lots/offerEdit?offer=${lot.id}`) },
         '-',
         {
           label: 'Удалить лот',

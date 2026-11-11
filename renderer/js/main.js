@@ -18,9 +18,11 @@ import { mountChats, chatKeys } from './views/chats.js';
 import { mountDeals, showDeals } from './views/deals.js';
 import { mountFinance, showFinance } from './views/finance.js';
 import { mountLots, showLots } from './views/lots.js';
+import { initWatch } from './features/watch.js';
 import { mountAutomation, showAutomation } from './views/automation.js';
 import { mountPluginPages, showPluginPage, syncPluginRail } from './features/plugpages.js';
 import { mountSettings, showSettings } from './views/settings.js';
+import { mountLchat, showLchat, hideLchat } from './views/lchat.js';
 import { showLogin } from './views/login.js';
 import { openProfile } from './views/profile.js';
 
@@ -30,6 +32,7 @@ const NAV = [
   ['finance', 'Финансы', 'wallet'],
   ['lots', 'Лоты', 'box'],
   ['auto', 'Автоматика и плагины', 'bot'],
+  ['lchat', 'Общий чат Lumen', 'users'],
 ];
 
 function shell() {
@@ -62,6 +65,7 @@ function shell() {
         <section class="view" id="v-lots"></section>
         <section class="view" id="v-plug"></section>
         <section class="view" id="v-auto"></section>
+        <section class="view" id="v-lchat"></section>
         <section class="view" id="v-settings"></section>
         <section class="view" id="v-error"></section>
       </main>
@@ -75,6 +79,7 @@ function shell() {
   mountPluginPages($('#v-plug'));
   mountAutomation($('#v-auto'));
   mountSettings($('#v-settings'));
+  mountLchat($('#v-lchat'));
   $('.rail').onclick = (e) => {
     const n = e.target.closest('[data-nav]');
     if (n) go(n.dataset.nav);
@@ -113,6 +118,8 @@ export function go(view, sub) {
   if (view === 'lots') showLots();
   if (view === 'auto') showAutomation();
   if (view === 'settings') showSettings(sub);
+  if (view === 'lchat') showLchat();
+  else hideLchat();
   if (sec === 'plug') showPluginPage(view.slice(5));
 }
 
@@ -255,6 +262,7 @@ async function boot() {
   document.addEventListener('visibilitychange', idle);
   shell();
   initFx();
+  initWatch();
   bus.on('nav', (v, sub) => go(v, sub));
   bus.on('status', setStatus);
   bus.on('switch-account', startAccount);

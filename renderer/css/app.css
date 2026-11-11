@@ -700,6 +700,8 @@ body:has(#login) #app { visibility: hidden; }
 .wp-bar .ibtn { width: 32px; height: 32px; }
 .wp-bar .ibtn:disabled { opacity: .35; pointer-events: none; }
 .wp-addr { flex: 1; min-width: 0; height: 30px; margin: 0 6px; display: flex; align-items: center; gap: 7px; padding: 0 12px; border-radius: 9px; background: var(--hover); border: 1px solid var(--line); color: var(--text-2); font-size: 12.5px; }
+.wp-addr .wp-url { user-select: text; cursor: text; }
+.wp-addr .wp-url::selection { background: rgba(var(--a-rgb), .35); color: var(--text); }
 .wp-lock { color: var(--ok); display: flex; }
 .wp-close:hover { background: #e5484d; color: #fff; }
 .wp-load { position: absolute; left: 0; bottom: -1px; height: 2px; width: 0; background: var(--grad); opacity: 0; }

@@ -32,8 +32,9 @@ export class Engine extends EventEmitter {
    * @param {string} o.pluginsDir папка с плагинами
    * @param {string[]} [o.off]   функции, которые здесь не нужны (например ['raise'] в приложении)
    */
-  constructor({ account, dataDir, pluginsDir, off = [], log } = {}) {
+  constructor({ account, dataDir, pluginsDir, off = [], log, accounts } = {}) {
     super();
+    this.accountsFn = accounts || null; // все аккаунты программы — для плагинов (api.accounts())
     this.setMaxListeners(50);
     this.acc = account;
     this.dir = dataDir;

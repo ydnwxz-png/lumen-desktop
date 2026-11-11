@@ -3,6 +3,7 @@ import { $, el, esc, fmtLeft } from '../core/util.js';
 import { icon } from '../core/icons.js';
 import { S, bus, saveSettings } from '../core/state.js';
 import { seg, switchEl, modal, confirmBox, err, ok, toast, busy } from '../ui/kit.js';
+import { notify } from '../features/notify.js';
 
 const VARS = ['$username', '$welcome', '$order_id', '$order_link', '$lot_name', '$price', '$product', '$stars', '$my_name', '$date', '$time'];
 const FEATURES = [
@@ -64,7 +65,12 @@ function onEvent(ev) {
   const d = ev.data || {};
   if (ev.type === 'delivered') toast('📦 Товар выдан', `${d.rule.name} → ${d.order.peer} (#${d.order.id})${d.left != null ? ` · осталось ${d.left}` : ''}`, { kind: 'ok', icon: 'box' });
   if (ev.type === 'deliveryEmpty') toast('⚠️ Закончился товар', `«${d.rule.name}» — заказ #${d.order.id} нужно выдать вручную`, { kind: 'err', icon: 'box', ms: 15000 });
-  if (ev.type === 'notify') toast(d.from || 'Плагин', d.text, { icon: 'layers', ms: 8000 });
+  if (ev.type === 'notify') {
+    const open = d.url ? () => S.backend?.openBrowser(d.url) : undefined;
+    // окно открыто — всплывашка внутри; свёрнуто или в трее — как обычное уведомление Lumen (со звуком)
+    if (S.focused) toast(d.title || d.from || 'Плагин', d.text, { icon: 'layers', ms: 8000, onClick: open });
+    else notify({ title: d.title || d.from || 'Плагин', name: d.from || 'Плагин', body: d.text, raw: true, kind: d.kind === 'order' ? 'order' : 'msg', onClick: open });
+  }
   if (ev.type === 'log' && data) {
     data.events.push(d);
     if (data.events.length > 60) data.events.shift();

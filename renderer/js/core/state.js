@@ -28,7 +28,7 @@ export const DEFAULT_SETTINGS = {
   density: 'comfortable',
   fontSize: 14,
   animations: true,
-  notify: { mode: 'lumen', corner: 'br', sound: true, volume: 0.55, msgSound: 'lumen', orderSound: 'coins', preview: true, whenFocused: false, orders: true },
+  notify: { mode: 'lumen', corner: 'br', sound: true, volume: 0.55, msgSound: 'lumen', orderSound: 'coins', preview: true, whenFocused: false, orders: true, allAccounts: true },
   pollInterval: 3,
   autoUpdate: true,
   tray: true,

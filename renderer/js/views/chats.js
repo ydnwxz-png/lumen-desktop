@@ -94,6 +94,7 @@ export function mountChats(container) {
   bus.on('later', () => V.page && renderLater());
   bus.on('settings', () => V.page && renderTplBar());
   bus.on('account', () => {
+    V.gen++;
     V.open = null;
     V.page = null;
     items.clear();
@@ -102,6 +103,7 @@ export function mountChats(container) {
     renderEmpty();
   });
   window.api?.app.on('nav:chat', (node) => {
+    if (/^acc:/.test(String(node || ''))) return; // чат другого аккаунта — им займётся features/watch.js
     bus.emit('nav', 'chats');
     openChat(node);
   });
@@ -238,7 +240,7 @@ async function resolveUids() {
 function chatMenu(x, y, node) {
   const c = CS.chats.find((i) => i.id === node) || { id: node, name: V.page?.peerName || '' };
   const m = meta(node);
-  const uid = c.uid || (V.open === node ? V.page?.peerId : '');
+  const uid = peerUid(c) || (V.open === node ? V.page?.peerId : '');
   menu(x, y, [
     { header: c.name || 'Чат' },
     { label: m.pinned ? 'Открепить' : 'Закрепить сверху', icon: 'pin', run: () => setMeta(node, { pinned: m.pinned ? false : Date.now() }) },
@@ -488,7 +490,9 @@ function setMessages(list) {
 }
 
 function appendDom(list, anim) {
-  let prev = lastRendered();
+  // с чем склеивать — только с тем, что реально стоит последним в ленте (не «самым поздним по времени»:
+  // часы компьютера и FunPay могут расходиться, и своё сообщение прилипало к группе покупателя — слева)
+  let prev = innerEl.lastElementChild?._m || null;
   // какой день уже подписан последним — берём из самой ленты, чтобы «Сегодня» не повторялось (иначе плашки слипаются стопкой)
   const days = innerEl.querySelectorAll('.day');
   let lastDay = days.length ? days[days.length - 1].dataset.k : '';
@@ -501,7 +505,7 @@ function appendDom(list, anim) {
     if (isSys(m)) innerEl.append(el(sysHtml(m)));
     else {
       let g = innerEl.lastElementChild;
-      if (!sameGroup(prev, m) || !g?.classList.contains('grp')) {
+      if (!sameGroup(prev, m) || !g?.classList.contains('grp') || g.dataset.author !== String(m.authorId)) {
         g = groupEl(m);
         innerEl.append(g);
       }
@@ -512,18 +516,12 @@ function appendDom(list, anim) {
   }
 }
 
-function lastRendered() {
-  const all = [...V.msgs, ...V.pending.map((p) => p.m)];
-  let last = null;
-  for (const m of all) if (innerEl.querySelector(`[data-id="${m.id}"]`) && (!last || (m.ts || 0) >= (last.ts || 0))) last = m;
-  return last;
-}
-
 function onMessages(list) {
   const fresh = list.filter((m) => !V.ids.has(m.id)).sort((a, b) => a.id - b.id);
   if (!fresh.length) return;
   const bottom = atBottom();
   const toAppend = [];
+  const confirmed = [];
   for (const m of fresh) {
     V.ids.add(m.id);
     V.msgs.push(m);
@@ -537,13 +535,18 @@ function onMessages(list) {
           b.classList.remove('pending');
           const mt = b.querySelector('.meta');
           if (mt) mt.innerHTML = `${hhmm(new Date(m.ts || Date.now()))}${icon('checks', 13)}`;
+          confirmed.push(m.id);
           continue;
         }
       }
     }
     toAppend.push(m);
   }
-  appendDom(toAppend, true);
+  // FunPay ставит сообщения строго по порядку. Если покупатель написал, пока наше сообщение было «в пути»,
+  // его сообщение должно стоять выше нашего — перерисовываем ленту (раньше наше оставалось выше до перезахода)
+  const outOfOrder = toAppend.length && (V.pending.length || confirmed.some((id) => toAppend.some((t) => t.id < id)));
+  if (outOfOrder) rebuild();
+  else appendDom(toAppend, true);
   if (toAppend.some(isSys) || toAppend.some((m) => findOrderIds(m.text).length)) renderHead();
   if (bottom || toAppend.some(isMine)) scrollBottom(true);
   else if (toAppend.length) {
@@ -552,6 +555,23 @@ function onMessages(list) {
     fab.innerHTML = `${icon('down', 20)}<span class="badge">${V.below}</span>`;
     fab.classList.add('show');
   }
+}
+
+/** Перерисовать ленту по порядку id; неотправленные/«в пути» — в самом низу. */
+function rebuild() {
+  const top = msgsEl.scrollTop;
+  const pending = V.pending.slice();
+  setMessages(V.msgs);
+  V.pending = [];
+  for (const p of pending) {
+    V.pending.push(p);
+    appendDom([p.m], false);
+    if (p.failed) {
+      const b = innerEl.querySelector(`[data-id="${p.m.id}"]`);
+      if (b) Object.assign(b, { _p: p, title: 'Не отправлено: ' + p.failed + '. Нажми, чтобы повторить' }).classList.add('failed');
+    }
+  }
+  msgsEl.scrollTop = top;
 }
 
 async function loadMore() {
@@ -839,6 +859,7 @@ async function sendImage(file, p) {
 }
 
 function markFailed(p, e) {
+  p.failed = e.message;
   const b = innerEl?.querySelector(`[data-id="${p.m.id}"]`);
   if (b) {
     b.classList.add('failed');
@@ -851,6 +872,7 @@ function markFailed(p, e) {
 function retry(b) {
   const p = b._p;
   if (!p) return;
+  p.failed = '';
   b.classList.remove('failed');
   if (p.m.file) sendImage(p.m.file, p);
   else sendText(p.m.text, p);

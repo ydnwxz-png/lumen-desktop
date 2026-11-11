@@ -29,6 +29,7 @@ contextBridge.exposeInMainWorld('api', {
   app: {
     info: () => call('app:info'),
     clipboard: () => call('app:clipboard'),
+    copy: (t) => call('app:copy', t),
     open: (url) => call('app:open', url),
     browser: (id, url) => call('app:browser', id, url),
     browserPrep: (id) => call('app:browserPrep', id),
@@ -47,7 +48,9 @@ contextBridge.exposeInMainWorld('api', {
   },
   ai: (cfg, messages) => call('ai:chat', cfg, messages),
   tr: (text) => call('tr:en', text),
+  trx: (text, sl, tl) => call('tr:x', text, sl, tl),
   fx: { list: () => call('fx:list') },
+  lumen: (path, method, body) => call('lumen:api', path, method, body),
   auto: {
     attach: (id, mode) => call('auto:attach', id, mode),
     detach: () => call('auto:detach'),

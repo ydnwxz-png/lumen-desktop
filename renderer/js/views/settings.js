@@ -200,6 +200,7 @@ function notif(w) {
       row('Показывать текст', 'Иначе просто «Новое сообщение»', sw(n.preview, (v) => set((s) => (s.notify.preview = v)))),
       row('Когда окно открыто', 'Тоже показывать всплывашку внутри окна', sw(n.whenFocused, (v) => set((s) => (s.notify.whenFocused = v)))),
       row('Новые заказы', 'Отдельное уведомление со своим звуком', sw(n.orders, (v) => set((s) => (s.notify.orders = v)))),
+      row('Со всех аккаунтов', 'Сообщения и заказы на других добавленных аккаунтах — даже когда сидишь на одном', sw(n.allAccounts !== false, (v) => set((s) => (s.notify.allAccounts = v)))),
       row('Тест', '', test)
     ),
     group(

@@ -117,7 +117,7 @@ for (let i = 0; i < 26; i++) {
 }
 
 let lotId = 70000;
-const myLots = lots.map((g) => ({ node: g.node, name: g.cat, url: '#', chips: false, lots: g.items.map(([title, price], j) => ({ id: String(++lotId), node: g.node, title, price: `${price} ₽`, priceNum: price, unit: '₽', amount: j === 1 ? '∞' : String(3 + j * 4), server: '', active: !(g.node === '4120'), auto: j === 0, url: '#' })) }));
+const myLots = lots.map((g) => ({ node: g.node, name: g.cat, url: '#', chips: false, lots: g.items.map(([title, price], j) => ({ id: String(++lotId), node: g.node, title, price: `${price} ₽`, priceNum: price, unit: '₽', amount: j === 1 ? '∞' : String(3 + j * 4), server: '', active: !(g.node === '4120'), auto: j === 0, url: 'https://funpay.com/lots/offer?id=' + lotId })) }));
 
 export function createDemo() {
   return {
@@ -235,12 +235,20 @@ export function createDemo() {
         regAgo: '1 год назад',
         rating: mine ? '4.9' : '5',
         reviewsCount: mine ? '1 284 отзыва' : '12 отзывов',
-        groups: mine ? myLots.map((g) => ({ name: g.name, url: '#', offers: g.lots.filter((l) => l.active).map((l) => ({ title: l.title, price: l.price, server: '', amount: l.amount, url: '#' })) })) : [],
+        groups: (mine ? myLots : myLots.slice(1, 3)).map((g) => ({ name: g.name, url: `https://funpay.com/lots/${g.node}/`, offers: g.lots.filter((l) => l.active).map((l) => ({ title: l.title, price: l.price, server: '', amount: l.amount, url: l.url })) })),
         reviews: chats.slice(0, 6).map((x, i) => ({ rating: i === 4 ? 4 : 5, text: ['Всё супер, быстро!', 'Лучший продавец, беру не первый раз', 'Выдал за минуту 🔥', 'Рекомендую', 'Немного подождал, но всё ок', 'Топ'][i], date: ['сегодня', 'вчера', '3 дня назад', 'неделю назад', '2 недели назад', 'месяц назад'][i], detail: `${x.lot[0].split('·')[0]}, ${x.lot[1]} ₽`, reply: i % 2 ? '' : 'Спасибо! 💜', author: x.name, order: x.order })),
         cont: '',
         chatNode: mine ? '' : `users-${ME.userId}-${id}`,
         chatId: c?.id,
       };
+    },
+    async catOffers(node) {
+      await wait(300);
+      // демо: в «Robux» ты в закрепе и сверху, в остальных — нет; чужие продавцы в закрепе в чётных категориях
+      const g = myLots.find((x) => x.node === String(node));
+      const meRow = { id: 'm' + node, uid: String(ME.userId), name: ME.username, title: g?.lots[0]?.title || '', price: '', promo: g?.name.includes('Robux'), top: g?.name.includes('Robux') };
+      const other = chats.slice(0, 3).map((c, i) => ({ id: 'o' + node + i, uid: String(c.uid), name: c.name, title: '', price: '', promo: (+node + i) % 2 === 0, top: false }));
+      return { title: g?.name || 'Категория ' + node, rows: [meRow, ...other] };
     },
     async moreReviews() {
       return { reviews: [], next: '' };
@@ -267,9 +275,16 @@ export function createDemo() {
       await wait(500);
       const now = Date.now();
       const items = [];
-      for (let i = 0; i < 60; i++) {
-        const o = orders[i % orders.length];
-        items.push({ ...o, state: i % 11 === 6 ? 'refunded' : i < 2 ? 'paid' : 'closed', ts: now - i * 11 * H });
+      // демо: ~4 месяца продаж, вечером и в выходные больше
+      let seed = 7;
+      const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+      let t = now;
+      for (let i = 0; i < 260; i++) {
+        const o = orders[Math.floor(rnd() * orders.length)];
+        t -= (2 + rnd() * 10) * H;
+        const d = new Date(t);
+        if (d.getHours() < 9 && rnd() < 0.7) t -= 6 * H;
+        items.push({ ...o, state: i % 13 === 6 ? 'refunded' : i < 2 ? 'paid' : 'closed', ts: t });
       }
       progress?.(items.length);
       return items.filter((x) => !cutoff || x.ts >= cutoff).map((x) => ({ ...x, date: new Date(x.ts).toLocaleString('ru-RU', { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' }) }));
@@ -282,6 +297,55 @@ export function createDemo() {
       await wait();
       const l = myLots.flatMap((g) => g.lots).find((x) => x.id === lot.id);
       if (l) l.active = on;
+    },
+    async lotEditor(lot) {
+      await wait(350);
+      const l = myLots.flatMap((g) => g.lots).find((x) => x.id === lot.id) || lot;
+      const C = (name, kind, value, label, extra = {}) => ({ name, base: name.replace(/\[(ru|en)\]$/, ''), lang: (/\[(ru|en)\]$/.exec(name) || [])[1] || '', kind, value, label, help: '', sys: kind === 'hidden', hidden: kind === 'hidden', disabled: false, ...extra });
+      return {
+        node: l.node,
+        offerId: l.id,
+        unit: '₽',
+        ctrls: [
+          C('csrf_token', 'hidden', 'demo'),
+          C('offer_id', 'hidden', l.id),
+          C('node_id', 'hidden', l.node),
+          C('fields[type]', 'select', '2', 'Тип', { options: [{ value: '1', text: 'С заходом на аккаунт' }, { value: '2', text: 'Кодом' }] }),
+          C('fields[region]', 'select', 'ua', 'Регион', { options: [{ value: 'ua', text: 'Украина' }, { value: 'tr', text: 'Турция' }] }),
+          C('fields[summary][ru]', 'text', l.title, 'Краткое описание'),
+          C('fields[summary][en]', 'text', '', 'Краткое описание'),
+          C('fields[desc][ru]', 'textarea', 'Пополнение быстро и безопасно.\nПишите перед покупкой.', 'Подробное описание'),
+          C('fields[desc][en]', 'textarea', '', 'Подробное описание'),
+          C('fields[payment_msg][ru]', 'textarea', 'Спасибо за покупку! Напишите логин.', 'Сообщение покупателю после оплаты'),
+          C('fields[payment_msg][en]', 'textarea', '', 'Сообщение покупателю после оплаты'),
+          C('price', 'text', String(l.priceNum), 'Цена'),
+          C('amount', 'text', /^\d+$/.test(l.amount) ? l.amount : '10', 'Наличие'),
+          C('auto_delivery', 'checkbox', 'on', 'Автовыдача', { checked: !!l.auto }),
+          C('secrets', 'textarea', l.auto ? 'KEY-1111\nKEY-2222' : '', 'Товары для автовыдачи — по одному на строку'),
+          C('active', 'hidden', ''),
+          C('active', 'checkbox', 'on', 'Активный — показывать покупателям', { checked: !!l.active }),
+        ],
+      };
+    },
+    async lotSaveEditor(ctrls) {
+      await wait(500);
+      const v = (n) => ctrls.find((c) => c.name === n);
+      const l = myLots.flatMap((g) => g.lots).find((x) => x.id === v('offer_id')?.value);
+      if (!l) return {};
+      const price = parseFloat(v('price').value);
+      if (!(price > 0)) throw new Error('Укажите цену');
+      Object.assign(l, { title: v('fields[summary][ru]').value, priceNum: price, price: `${price} ₽`, amount: v('amount').value, active: !!ctrls.find((c) => c.name === 'active' && c.kind === 'checkbox')?.checked, auto: !!v('auto_delivery').checked });
+      return {};
+    },
+    async lotCalc() {
+      await wait(200);
+      return [
+        { name: 'Банковская карта RU', unit: '₽', k: 1.1702 },
+        { name: 'Банковская карта RU', unit: '$', k: 0.01366 },
+        { name: 'Банковская карта RU', unit: '€', k: 0.01224 },
+        { name: 'СБП (оплата по QR)', unit: '₽', k: 1.1202 },
+        { name: 'ЕРИП (Беларусь)', unit: '₽', k: 1.1702 },
+      ];
     },
     async lotSetPrice(lot, price) {
       await wait();

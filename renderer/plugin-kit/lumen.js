@@ -33,6 +33,7 @@
     copy: (text) => call('copy', text),
     open: (url) => call('open', url),
     translate: (text) => call('translate', text),
+    plugin: (name, ...args) => call('plugin', name, ...args),
     storage: { get: (k, d) => call('storage.get', k, d), set: (k, v) => call('storage.set', k, v) },
     fp: {
       myLots: () => call('fp.myLots'),

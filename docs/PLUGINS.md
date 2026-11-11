@@ -120,6 +120,17 @@ await api.account.lotSetActive(lot, true)       // включить / выклю
 await api.account.lotSetPrice(lot, 199)         // поменять цену
 await api.account.raiseGames()                  // что можно поднять
 await api.account.raiseGame(gameId, nodes)      // поднять
+await api.account.catOffers(node, chips)        // кто продаёт в категории: { title, rows: [{ id, uid, name, title, price, promo, top }] }
+                                                //   promo — продавец в закрепе FunPay, top — его лот сейчас в самом верху
+```
+
+**`api.accounts()` — все аккаунты, добавленные в Lumen** (не только тот, на котором сидишь):
+
+```js
+const list = await api.accounts()   // [{ id, userId, username, active, account }]
+for (const a of list) {
+  const lots = await a.account.myLots()   // у account — те же функции, что у api.account
+}
 ```
 
 ---
@@ -182,3 +193,28 @@ export default {
 | `lumen.fp.lotNewForm(node)` | Поля нового лота в разделе: `{ form, selects: [{ name, label, options }] }` |
 | `lumen.fp.lotCreate({ node, title:{ru,en}, desc:{ru,en}, price, amount, selects:{name:value} })` | Создать лот → `{ id, url }` |
 | `lumen.fp.withdrawRate()` | Курс вывода в USDT: `{ rate, fee, min }` |
+| `lumen.plugin(name, ...args)` | Вызвать свою функцию плагина из `page.api` (работает в программе, со всеми аккаунтами) |
+
+### Свои функции для страницы (page.api)
+
+Страница работает в окошке, а тяжёлая работа — в самом плагине. Опиши функции в `page.api` и зови их со страницы через `lumen.plugin()`. Последним аргументом приходит `api`.
+
+```js
+export default {
+  id: 'my-stats',
+  name: 'Моя статистика',
+  page: {
+    title: 'Статистика',
+    icon: '📊',
+    html: `<button class="btn pri" id="b">Сколько аккаунтов?</button>
+      <script>b.onclick = async () => lumen.toast('Аккаунтов', String(await lumen.plugin('count')), 'ok');</script>`,
+    api: {
+      async count(api) {
+        return (await api.accounts()).length;
+      },
+    },
+  },
+};
+```
+
+Уведомление с заголовком и ссылкой: `api.notify('текст', { title: 'Заголовок', url: 'https://funpay.com/…' })` — приходит и когда окно Lumen свёрнуто.

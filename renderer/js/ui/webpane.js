@@ -1,7 +1,7 @@
 // Встроенная панель FunPay: открывается внутри окна Lumen, а не отдельным окном.
-import { el, esc } from '../core/util.js';
+import { el, esc, copyText } from '../core/util.js';
 import { icon } from '../core/icons.js';
-import { err } from './kit.js';
+import { err, ok, menu } from './kit.js';
 import { supportFillScript } from '../features/support.js';
 
 let pane = null; // { box, wv, partition }
@@ -44,6 +44,7 @@ export async function openWebPane(accId, url, opts = {}) {
       <button class="ibtn sm" data-b="fwd" data-tip="Вперёд">${icon('chevR', 18)}</button>
       <button class="ibtn sm" data-b="reload" data-tip="Обновить">${icon('refresh', 16)}</button>
       <div class="wp-addr"><span class="wp-lock">${icon('globe', 13)}</span><span class="wp-url ell"></span></div>
+      <button class="ibtn sm" data-b="copy" data-tip="Скопировать адрес">${icon('copy', 15)}</button>
       <button class="ibtn sm" data-b="ext" data-tip="Открыть в обычном браузере">${icon('external', 16)}</button>
       <button class="ibtn sm wp-close" data-b="close" data-tip="Закрыть (Esc)">${icon('x', 18)}</button>
       <i class="wp-load"></i>
@@ -67,12 +68,31 @@ export async function openWebPane(accId, url, opts = {}) {
   wv.addEventListener('did-start-loading', () => box.classList.add('loading'));
   wv.addEventListener('did-stop-loading', () => (box.classList.remove('loading'), sync()));
   urlEl.textContent = url.replace(/^https:\/\//, '');
+  const cur = () => {
+    try {
+      return wv.getURL() || url;
+    } catch {
+      return url;
+    }
+  };
+  // адрес можно выделить мышью; правый клик — меню
+  box.querySelector('.wp-addr').addEventListener('contextmenu', (e) => {
+    e.preventDefault();
+    const sel = String(getSelection() || '').trim();
+    menu(e.clientX, e.clientY, [
+      sel && { label: 'Копировать выделенное', icon: 'copy', run: () => copyText(sel) },
+      { label: 'Скопировать адрес', icon: 'copy', run: () => copyText(cur()).then(() => ok('Адрес скопирован', cur())) },
+      { label: 'Открыть в обычном браузере', icon: 'external', run: () => window.api?.app.open(cur()) },
+      { label: 'Обновить', icon: 'refresh', run: () => wv.reload() },
+    ]);
+  });
   box.querySelector('.wp-bar').onclick = (e) => {
     const b = e.target.closest('[data-b]')?.dataset.b;
     if (b === 'back' && wv.canGoBack()) wv.goBack();
     if (b === 'fwd' && wv.canGoForward()) wv.goForward();
     if (b === 'reload') wv.reload();
-    if (b === 'ext') window.api?.app.open((wv.getURL && wv.getURL()) || url);
+    if (b === 'ext') window.api?.app.open(cur());
+    if (b === 'copy') copyText(cur()).then(() => ok('Адрес скопирован', cur()));
     if (b === 'close') closeWebPane();
   };
   // автозаполнение формы поддержки: пробуем несколько раз — форма может дорисовываться скриптами

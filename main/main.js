@@ -65,6 +65,7 @@ handle('acc:add-browser', async () => {
 handle('acc:remove', async (id) => {
   await automation.detach();
   sessions.delete(id);
+  automation.forgetAccount(id);
   store.removeAccount(id);
   session.fromPartition('persist:fp-' + id).clearStorageData().catch(() => {});
   return true;
@@ -93,6 +94,7 @@ handle('store:get', (key, def) => store.get(key, def));
 handle('store:set', (key, value) => store.set(key, value));
 
 handle('app:clipboard', () => clipboard.readText());
+handle('app:copy', (t) => (clipboard.writeText(String(t ?? '')), true));
 
 // Украшения ников Lumen FX: список с сервера (как у расширения Lumen). Копия хранится на случай без интернета.
 const FX_URL = process.env.LUMEN_FX_URL || 'https://lumenfp.online/fx.json';
@@ -113,6 +115,36 @@ handle('fx:list', async () => {
     return data;
   } catch {
     return fxCache.data || store.get('fxCache', null);
+  }
+});
+// Общий чат Lumen и «онлайн»: тот же сервер, что у расширения и приложения на телефон.
+const LUMEN_API = process.env.LUMEN_API || 'https://lumenfp.online';
+function lumenIid() {
+  let iid = store.get('lumenIid', '');
+  if (!/^[a-z0-9]{20}$/.test(iid)) {
+    iid = Array.from(require('crypto').randomBytes(20), (x) => 'abcdefghijklmnopqrstuvwxyz0123456789'[x % 36]).join('');
+    store.set('lumenIid', iid);
+  }
+  return iid;
+}
+handle('lumen:api', async (p, method, body) => {
+  p = String(p || '');
+  if (!/^\/api\/(chat(\/(login|me|send))?|online)(\?|$)/.test(p)) throw new Error('bad path');
+  let url = LUMEN_API + p;
+  if (/^\/api\/(chat|online)(\?|$)/.test(p)) url += (p.includes('?') ? '&' : '?') + 'i=' + lumenIid() + '&c=desk';
+  const post = method === 'POST';
+  const ctl = new AbortController();
+  const t = setTimeout(() => ctl.abort(), 15000);
+  try {
+    const r = await fetch(url, {
+      method: post ? 'POST' : 'GET', signal: ctl.signal,
+      headers: Object.assign({ 'User-Agent': 'Lumen-Desktop' }, post ? { 'Content-Type': 'application/json' } : {}),
+      body: post ? JSON.stringify(Object.assign({ c: 'desk' }, body || {})) : undefined,
+    });
+    const j = await r.json().catch(() => null);
+    return { status: r.status, j };
+  } finally {
+    clearTimeout(t);
   }
 });
 handle('auto:attach', (id, mode) => automation.attach(id, sessionFor(id), mode));
@@ -181,6 +213,39 @@ handle('tr:en', async (text) => {
   if (!r.ok) throw new Error(`Переводчик не ответил (HTTP ${r.status})`);
   const j = await r.json();
   return (j?.[0] || []).map((x) => x?.[0] || '').join('');
+});
+// Перевод в обе стороны (RU ⇄ EN) для редактора лота
+handle('tr:x', async (text, sl, tl) => {
+  const L = /^(ru|en|auto)$/;
+  sl = L.test(sl) ? sl : 'auto';
+  tl = /^(ru|en)$/.test(tl) ? tl : 'en';
+  const src = String(text || '');
+  if (!src.trim()) return '';
+  // длинный текст — кусками по строкам, чтобы переводчик не обрезал
+  const chunks = [];
+  let cur = '';
+  for (const ln of src.split('\n')) {
+    if (cur && (cur + '\n' + ln).length > 1500) (chunks.push(cur), (cur = ln));
+    else cur = cur ? cur + '\n' + ln : ln;
+  }
+  if (cur) chunks.push(cur);
+  const out = [];
+  for (const c of chunks) {
+    if (!c.trim()) {
+      out.push(c);
+      continue;
+    }
+    const r = await fetch(`https://translate.googleapis.com/translate_a/single?client=gtx&sl=${sl}&tl=${tl}&dt=t`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8' },
+      body: 'q=' + encodeURIComponent(c),
+      signal: AbortSignal.timeout(20000),
+    });
+    if (!r.ok) throw new Error(`Переводчик не ответил (HTTP ${r.status})`);
+    const j = await r.json();
+    out.push((j?.[0] || []).map((x) => x?.[0] || '').join(''));
+  }
+  return out.join('\n');
 });
 handle('ai:chat', async (cfg, messages) => {
   const base = String(cfg.base || 'https://api.openai.com/v1').replace(/\/+$/, '');
@@ -434,6 +499,44 @@ async function prepBrowser(id) {
   return { partition: part, ua: s.ua };
 }
 
+// Правый клик внутри страниц FunPay (встроенная панель и отдельное окно):
+// копировать / вставить / выделить всё, ссылки, адрес страницы, назад / обновить.
+const FP_RE = /^https:\/\/([a-z0-9-]+\.)?funpay\.com\//;
+function pageMenu(wc, p, host) {
+  const nav = wc.navigationHistory;
+  const items = [];
+  for (const w of (p.dictionarySuggestions || []).slice(0, 5)) items.push({ label: w, click: () => wc.replaceMisspelling(w) });
+  if (items.length) items.push({ type: 'separator' });
+  if (p.linkURL && /^https?:/.test(p.linkURL)) {
+    items.push(
+      { label: 'Открыть ссылку', click: () => (FP_RE.test(p.linkURL) ? wc.loadURL(p.linkURL) : shell.openExternal(p.linkURL)) },
+      { label: 'Открыть в обычном браузере', click: () => shell.openExternal(p.linkURL) },
+      { label: 'Скопировать ссылку', click: () => clipboard.writeText(p.linkURL) },
+      { type: 'separator' }
+    );
+  }
+  if (p.isEditable) {
+    items.push(
+      { label: 'Вырезать', role: 'cut', enabled: p.editFlags.canCut },
+      { label: 'Копировать', role: 'copy', enabled: p.editFlags.canCopy },
+      { label: 'Вставить', role: 'paste', enabled: p.editFlags.canPaste },
+      { label: 'Выделить всё', role: 'selectAll' }
+    );
+  } else {
+    if (p.selectionText) items.push({ label: 'Копировать', role: 'copy' });
+    items.push({ label: 'Выделить всё', role: 'selectAll' });
+  }
+  if (p.mediaType === 'image' && p.srcURL) items.push({ label: 'Скопировать ссылку на картинку', click: () => clipboard.writeText(p.srcURL) });
+  items.push(
+    { type: 'separator' },
+    { label: 'Назад', enabled: nav ? nav.canGoBack() : wc.canGoBack(), click: () => (nav ? nav.goBack() : wc.goBack()) },
+    { label: 'Обновить', click: () => wc.reload() },
+    { label: 'Скопировать адрес страницы', click: () => clipboard.writeText(wc.getURL()) },
+    { label: 'Открыть страницу в обычном браузере', click: () => shell.openExternal(wc.getURL()) }
+  );
+  Menu.buildFromTemplate(items).popup(host && !host.isDestroyed() ? { window: host } : {});
+}
+
 async function openBrowser(id, url) {
   const { partition: part } = await prepBrowser(id);
   const w = new BrowserWindow({
@@ -451,6 +554,7 @@ async function openBrowser(id, url) {
     } else if (/^https?:\/\//.test(u)) shell.openExternal(u);
     return { action: 'deny' };
   });
+  w.webContents.on('context-menu', (_e, p) => pageMenu(w.webContents, p, w));
   w.loadURL(url || 'https://funpay.com/');
   return true;
 }
@@ -459,6 +563,8 @@ async function openBrowser(id, url) {
 
 app.on('web-contents-created', (_e, wc) => {
   if (wc.getType() !== 'webview') return;
+  // правый клик в панели FunPay: копировать, ссылки, адрес, назад
+  wc.on('context-menu', (_e, p) => pageMenu(wc, p, wc.hostWebContents ? BrowserWindow.fromWebContents(wc.hostWebContents) : win));
   // ссылки FunPay открываем в той же панели, остальные — в обычном браузере
   wc.setWindowOpenHandler(({ url: u }) => {
     if (/^https:\/\/([a-z0-9-]+\.)?funpay\.com\//.test(u)) wc.loadURL(u);
@@ -503,7 +609,9 @@ app.whenReady().then(() => {
   createWindow();
   if (!isMac) createTray();
   updater.init((st) => win && !win.isDestroyed() && win.webContents.send('upd:state', st), settings);
-  automation.init((ev) => win && !win.isDestroyed() && win.webContents.send('auto:event', ev));
+  automation.init((ev) => win && !win.isDestroyed() && win.webContents.send('auto:event', ev), {
+    accounts: () => store.accounts().map((a) => ({ id: a.id, userId: a.userId, username: a.username, session: sessionFor(a.id) })),
+  });
 });
 app.on('activate', () => gotLock && showMain());
 app.on('before-quit', () => {

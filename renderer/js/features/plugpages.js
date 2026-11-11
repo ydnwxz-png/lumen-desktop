@@ -93,6 +93,8 @@ const METHODS = {
   'fp.lotNewForm': (_, node) => S.backend.lotNewForm(String(node)),
   'fp.lotCreate': (_, f) => S.backend.lotCreate(f),
   'fp.withdrawRate': () => S.backend.withdrawRate(),
+  // свои функции плагина (page.api) — работают в главном процессе, со всеми аккаунтами
+  plugin: (id, name, ...args) => (AUTO()?.plugin ? AUTO().plugin('call', id, String(name), args) : Promise.reject(new Error('Плагины работают только в приложении'))),
 };
 
 async function onMessage(e) {

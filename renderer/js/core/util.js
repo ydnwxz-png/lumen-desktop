@@ -166,6 +166,10 @@ export function fmtLeft(ms) {
 }
 
 export async function copyText(t) {
+  // в программе — через системный буфер (работает, даже если окно не в фокусе)
+  try {
+    if (window.api?.app?.copy) return !!(await window.api.app.copy(String(t ?? '')));
+  } catch {}
   try {
     await navigator.clipboard.writeText(t);
     return true;

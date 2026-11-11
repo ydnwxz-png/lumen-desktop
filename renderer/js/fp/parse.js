@@ -442,6 +442,106 @@ export function parseOfferSelects(html) {
   });
 }
 
+/* ---------------------------------------------------------------- редактор лота
+   Вся форма лота как есть: каждое поле с подписью, типом и значением.
+   Ничего не выдумываем — шлём обратно ровно те поля, что прислал FunPay (как браузер). */
+const SYS_FIELDS = new Set(['csrf_token', 'form_created_at', 'offer_id', 'node_id', 'location', 'deleted']);
+const FIELD_NAMES = {
+  price: 'Цена',
+  amount: 'Наличие',
+  active: 'Активный — показывать покупателям',
+  auto_delivery: 'Автовыдача',
+  secrets: 'Товары для автовыдачи — по одному на строку',
+  'fields[summary]': 'Краткое описание (название лота)',
+  'fields[desc]': 'Подробное описание',
+  'fields[payment_msg]': 'Сообщение покупателю после оплаты',
+};
+const isHiddenEl = (e, form) => {
+  for (let x = e; x && x !== form; x = x.parentElement) {
+    if (x.classList?.contains('hidden') || x.hasAttribute?.('hidden') || /display\s*:\s*none/i.test(x.getAttribute?.('style') || '')) return true;
+  }
+  return false;
+};
+/** → { ctrls:[{name,base,lang,kind,value,checked,options,label,help,hidden,sys,disabled}], node, offerId, unit } | null */
+export function parseOfferEditor(html) {
+  const d = doc(html);
+  const form = d.querySelector('form.form-offer-editor') || [...d.querySelectorAll('form')].find((f) => f.querySelector('[name=node_id]'));
+  if (!form) return null;
+  const ctrls = [];
+  for (const e of form.querySelectorAll('input[name], textarea[name], select[name]')) {
+    const name = e.getAttribute('name');
+    const tag = e.tagName.toLowerCase();
+    const ty = tag === 'input' ? (e.getAttribute('type') || 'text').toLowerCase() : tag;
+    if (['submit', 'button', 'file', 'image', 'reset'].includes(ty)) continue;
+    const m = /^(.*)\[(ru|en)\]$/.exec(name);
+    const base = m ? m[1] : name;
+    const g = e.closest('.form-group, .lot-field') || e.parentElement;
+    let label = squash(txt(g?.querySelector('label.control-label, .control-label, label:not(.checkbox):not(.radio)')));
+    if (ty === 'checkbox' || ty === 'radio') label = squash(txt(e.closest('label'))) || label;
+    label = label.replace(/\s*\*\s*$/, '') || FIELD_NAMES[base] || FIELD_NAMES[name] || name;
+    const help = squash(txt(g?.querySelector('.help-block, .form-text')));
+    const c = { name, base, lang: m ? m[2] : '', kind: ty === 'hidden' ? 'hidden' : ty === 'checkbox' || ty === 'radio' ? ty : tag === 'select' ? 'select' : tag === 'textarea' ? 'textarea' : 'text', label, help, sys: SYS_FIELDS.has(name), hidden: ty === 'hidden' || isHiddenEl(e, form), disabled: e.hasAttribute('disabled') };
+    if (tag === 'textarea') c.value = e.textContent;
+    else if (tag === 'select') {
+      c.options = [...e.querySelectorAll('option')].map((o) => ({ value: o.getAttribute('value') ?? o.textContent, text: squash(o.textContent) || squash(o.getAttribute('data-content') || '').replace(/<[^>]+>/g, '') }));
+      const o = [...e.querySelectorAll('option')].find((x) => x.hasAttribute('selected'));
+      c.value = o ? (o.getAttribute('value') ?? o.textContent) : (c.options[0]?.value ?? '');
+    } else {
+      c.value = e.getAttribute('value') ?? (c.kind === 'checkbox' || c.kind === 'radio' ? 'on' : '');
+      if (c.kind === 'checkbox' || c.kind === 'radio') c.checked = e.hasAttribute('checked');
+    }
+    if (FIELD_NAMES[base] && (label === name || /^fields\[/.test(label))) c.label = FIELD_NAMES[base];
+    ctrls.push(c);
+  }
+  const price = form.querySelector('[name=price]');
+  const pg = price?.closest('.form-group, .input-group') || price?.parentElement;
+  const unit = (/₽|\$|€|руб/i.exec(txt(pg?.querySelector('.input-group-addon, .input-group-text, .unit')) || txt(pg)) || ['₽'])[0].replace(/руб/i, '₽');
+  return { ctrls, node: form.querySelector('[name=node_id]')?.getAttribute('value') || '', offerId: form.querySelector('[name=offer_id]')?.getAttribute('value') || '', unit };
+}
+
+/** Поля редактора → пары для /lots/offerSave (как отправил бы браузер). */
+export function offerEditorPairs(ctrls) {
+  const out = [];
+  for (const c of ctrls) {
+    if (c.disabled || c.name === 'csrf_token') continue;
+    if (c.kind === 'checkbox' || c.kind === 'radio') {
+      if (c.name === 'active') continue;
+      if (c.checked) out.push([c.name, c.value || 'on']);
+    } else out.push([c.name, c.value ?? '']);
+  }
+  // «Активный»: как в lotSetActive — пустое поле всегда, «on», если включён
+  const act = ctrls.find((c) => c.name === 'active' && c.kind === 'checkbox');
+  if (act) {
+    if (!out.some(([k]) => k === 'active')) out.push(['active', '']);
+    if (act.checked) out.push(['active', 'on']);
+  }
+  return out;
+}
+
+/** Публичная страница категории (/lots/123/ или /chips/123/): кто продаёт и кто в закрепе.
+    FunPay: offer-promo — продавец в закрепе (стоит на своём месте с 📌),
+    offer-promoted — копия закреплённого лота в самом верху списка. */
+export function parseCatOffers(html) {
+  const d = doc(html);
+  const by = new Map();
+  for (const a of d.querySelectorAll('a.tc-item')) {
+    const id = (/[?&]id=([0-9A-Za-z-]+)/.exec(a.getAttribute('href') || '') || [])[1];
+    if (!id) continue;
+    const u = a.querySelector('.tc-user [data-href*="/users/"], .tc-user a[href*="/users/"], [data-href*="/users/"]');
+    const uid = a.getAttribute('data-user') || (/users\/(\d+)/.exec(u?.getAttribute('data-href') || u?.getAttribute('href') || '') || [])[1] || '';
+    const top = a.classList.contains('offer-promoted');
+    const promo = top || a.classList.contains('offer-promo') || !!a.querySelector('.promo-offer-icon');
+    const prev = by.get(id);
+    if (prev) {
+      prev.top ||= top;
+      prev.promo ||= promo;
+      continue;
+    }
+    by.set(id, { id, uid: String(uid), name: squash(txt(a.querySelector('.media-user-name'))), title: squash(txt(a.querySelector('.tc-desc-text') || a.querySelector('.tc-desc'))).slice(0, 140), price: squash(txt(a.querySelector('.tc-price'))), promo, top });
+  }
+  return { title: squash(txt(d.querySelector('h1'))), rows: [...by.values()] };
+}
+
 /** Курс вывода в USDT (TRC20) со страницы баланса: { rate, fee, min, info } */
 export function parseWithdrawRate(html) {
   const dec = String(html || '').replace(/&quot;|&#34;/g, '"').replace(/&amp;/g, '&');

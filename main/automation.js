@@ -10,6 +10,8 @@ const mod = (p) => import(pathToFileURL(path.join(ROOT, p)).href);
 
 let cur = null; // { accId, engine }
 let emit = () => {};
+let accountsList = () => []; // [{ id, userId, username, session }] — из main.js
+const accCache = new Map(); // id → account
 let gen = 0;
 
 const pluginsDir = () => path.join(app.getPath('userData'), 'plugins');
@@ -43,7 +45,19 @@ async function attach(accId, session, mode) {
   const account = await accountFromSession(session);
   const me = await session.auth(false);
   if (my !== gen) return null;
-  const engine = new Engine({ account, dataDir: path.join(app.getPath('userData'), 'automation', String(me.userId)), pluginsDir: pluginsDir(), off: ['raise'] });
+  const accounts = async () => {
+    const out = [];
+    for (const a of accountsList()) {
+      if (a.id === accId) {
+        out.push({ id: a.id, userId: a.userId, username: a.username, active: true, account });
+        continue;
+      }
+      if (!accCache.has(a.id)) accCache.set(a.id, await accountFromSession(a.session));
+      out.push({ id: a.id, userId: a.userId, username: a.username, active: false, account: accCache.get(a.id) });
+    }
+    return out;
+  };
+  const engine = new Engine({ account, dataDir: path.join(app.getPath('userData'), 'automation', String(me.userId)), pluginsDir: pluginsDir(), off: ['raise'], accounts });
   for (const ev of ['message', 'order', 'orderStatus', 'review', 'delivered', 'deliveryEmpty', 'command', 'notify', 'status', 'log']) {
     engine.on(ev, (data) => emit({ type: ev, data: slim(ev, data) }));
   }
@@ -88,9 +102,11 @@ function info() {
 }
 
 module.exports = {
-  init(onEvent) {
+  init(onEvent, opts = {}) {
     emit = onEvent;
+    if (opts.accounts) accountsList = opts.accounts;
   },
+  forgetAccount: (id) => accCache.delete(id),
   attach,
   detach,
   syncMode,
@@ -114,6 +130,7 @@ module.exports = {
     if (action === 'setting') e.plugins.setSetting(id, a, b);
     if (action === 'remove') await e.plugins.remove(id);
     if (action === 'reload') await e.plugins.loadAll();
+    if (action === 'call') return e.plugins.pageCall(id, a, b);
     if (action === 'install') {
       const p = await e.plugins.install(id, a);
       if (p.error) {

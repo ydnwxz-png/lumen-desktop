@@ -58,7 +58,7 @@ const themeColors = () => {
 export function notify(p) {
   const n = S.settings.notify;
   if (n.mode === 'off') return;
-  const body = n.preview ? p.body : 'Новое сообщение';
+  const body = n.preview || p.raw ? p.body : 'Новое сообщение';
   sound(p.kind);
   if (S.focused || !window.api) {
     if (S.focused && !n.whenFocused && p.kind !== 'order') return;

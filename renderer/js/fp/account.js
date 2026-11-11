@@ -125,9 +125,17 @@ export function createAccount(transport, { accId = '' } = {}) {
     async trades(kind, state, cont) {
       const base = kind === 'sales' ? '/orders/trade' : '/orders/';
       const url = state ? `${base}?state=${state}` : base;
-      const r = cont ? await post(url, [['continue', cont]], false) : await get(url);
-      if (r.status >= 400) throw new Error(`Список заказов не открылся (HTTP ${r.status})`);
-      return P.parseTrade(r.text);
+      // 429 — FunPay просит не спешить: ждём и пробуем ещё (2, 5, 10 секунд)
+      for (let i = 0; ; i++) {
+        const r = cont ? await post(url, [['continue', cont]], false) : await get(url);
+        if (r.status === 429 && i < 3) {
+          await new Promise((res) => setTimeout(res, [2000, 5000, 10000][i]));
+          continue;
+        }
+        if (r.status === 429) throw Object.assign(new Error('FunPay просит подождать — слишком много запросов. Попробуй через минуту'), { code: 429 });
+        if (r.status >= 400) throw new Error(`Список заказов не открылся (HTTP ${r.status})`);
+        return P.parseTrade(r.text);
+      }
     },
     async transactions(cont) {
       const r = await post('/users/transactions', [['user_id', me.userId], ['filter', ''], ['continue', cont || '']], false);
@@ -214,7 +222,19 @@ export function createAccount(transport, { accId = '' } = {}) {
       const all = [];
       let cont = '';
       for (let i = 0; i < maxPages; i++) {
-        const { items, next } = await this.trades('sales', '', cont);
+        if (i) await new Promise((res) => setTimeout(res, 700)); // не долбим FunPay — иначе 429
+        let page;
+        try {
+          page = await this.trades('sales', '', cont);
+        } catch (e) {
+          // часть уже загрузили — отдаём, что есть, с пометкой
+          if (all.length && e.code === 429) {
+            all.partial = true;
+            break;
+          }
+          throw e;
+        }
+        const { items, next } = page;
         all.push(...items);
         progress?.(all.length);
         const older = cutoff && items.some((t) => (parseFpDate(t.date)?.getTime() || Infinity) < cutoff);
@@ -293,6 +313,42 @@ export function createAccount(transport, { accId = '' } = {}) {
         if (am && (!am[1] || am[1] === '0')) am[1] = '1';
       }
       return this.lotSave(f);
+    },
+    /** Полная форма лота для редактора: { ctrls, node, offerId, unit } */
+    async lotEditor(lot) {
+      const r = await get(`/lots/offerEdit?offer=${encodeURIComponent(lot.id)}`);
+      if (r.status >= 400) throw new Error(`Форма лота не открылась (HTTP ${r.status})`);
+      const f = P.parseOfferEditor(r.text);
+      if (!f || !f.ctrls.length) throw new Error('Форма лота не открылась — проверь, что вход в FunPay выполнен');
+      if (!f.ctrls.some((c) => c.name === 'node_id')) f.ctrls.push({ name: 'node_id', base: 'node_id', kind: 'hidden', value: String(lot.node || ''), sys: true, hidden: true });
+      f.node ||= String(lot.node || '');
+      return f;
+    },
+    /** Сохранить все поля из редактора. */
+    async lotSaveEditor(ctrls) {
+      const act = ctrls.find((c) => c.name === 'active' && c.kind === 'checkbox');
+      const am = ctrls.find((c) => c.name === 'amount');
+      if (act?.checked && am && (!am.value || am.value === '0')) am.value = '1';
+      return this.lotSave(P.offerEditorPairs(ctrls));
+    },
+    /** Калькулятор FunPay: сколько заплатит покупатель при каждом способе оплаты.
+        → [{ name, unit, k }] — k = цена покупателя / твоя цена */
+    async lotCalc(node) {
+      const TEST = 100000;
+      const r = await post('/lots/calc', [['nodeId', String(node)], ['price', String(TEST)]], false);
+      let j = {};
+      try {
+        j = JSON.parse(r.text);
+      } catch {}
+      return (j.methods || [])
+        .map((m, i) => ({ name: m.name || m.title || 'Способ ' + (i + 1), unit: String(m.unit || '').trim(), k: parseFloat(String(m.price).replace(/\s/g, '').replace(',', '.')) / TEST }))
+        .filter((m) => m.k > 0);
+    },
+    /** Кто продаёт в категории и кто в закрепе — публичная страница категории. */
+    async catOffers(node, chips) {
+      const r = await get(`/${chips ? 'chips' : 'lots'}/${encodeURIComponent(node)}/`);
+      if (r.status >= 400) throw new Error(`Категория не открылась (HTTP ${r.status})`);
+      return P.parseCatOffers(r.text);
     },
     async lotSetPrice(lot, price) {
       const f = await this.lotForm(lot);

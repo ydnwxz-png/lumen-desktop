@@ -103,6 +103,8 @@ export class Plugins {
       sendImage: (chat, data, fileName = 'image.png', mime = 'image/png') => e.sendImage(chat, data, fileName, mime),
       fill: (text, ctx) => fill(text, { myName: e.me?.username, ...ctx }),
       chatWith: (userId) => e.acc.chatWith(userId),
+      // все аккаунты, добавленные в Lumen: [{ id, userId, username, active, account }]
+      accounts: async () => (e.accountsFn ? e.accountsFn() : [{ id: '', userId: e.me?.userId, username: e.me?.username, active: true, account: e.acc }]),
       storage: {
         get: (k, d) => (entry.store.data[k] === undefined ? d : entry.store.data[k]),
         set: (k, v) => {
@@ -122,6 +124,15 @@ export class Plugins {
     const p = this.list.get(id);
     if (!p || !this.enabled(id) || typeof p.plugin.page?.html !== 'string') return null;
     return p.plugin.page.html;
+  }
+
+  /** Страница плагина вызывает его функцию: page.api[name](...args, api) */
+  async pageCall(id, name, args) {
+    const p = this.list.get(id);
+    if (!p || !this.enabled(id)) throw new Error('Плагин выключен');
+    const fn = p.plugin.page?.api?.[name];
+    if (typeof fn !== 'function') throw new Error('В плагине нет функции ' + name);
+    return withTimeout(Promise.resolve(fn.call(p.plugin, ...(Array.isArray(args) ? args : []), this.api(id))), 120000);
   }
 
   /** Вызвать обработчик у всех включённых плагинов. Ошибка одного не мешает остальным. */

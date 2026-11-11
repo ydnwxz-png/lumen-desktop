@@ -4,6 +4,7 @@ import { icon } from '../core/icons.js';
 import { S, bus } from '../core/state.js';
 import { modal, err, stars } from '../ui/kit.js';
 import { myNick, nickHtml } from '../features/nicks.js';
+import { lotMenu } from '../features/lotlink.js';
 
 export async function openProfile(userId) {
   const m = modal(`<button class="ibtn x" data-close>${icon('x', 18)}</button><div class="pbody"><div class="empty" style="height:420px"><div class="spinner"></div></div></div>`, { wide: true });
@@ -33,11 +34,19 @@ export async function openProfile(userId) {
         <div class="stat"><div class="lbl">${icon('chat', 14)}Отзывы</div><div class="val" style="font-size:17px;margin-top:10px">${esc(p.reviewsCount || 'нет')}</div></div>
         <div class="stat"><div class="lbl">${icon('clock', 14)}На FunPay</div><div class="val" style="font-size:17px;margin-top:10px">${esc(p.regAgo || p.regDate || '—')}</div></div>
       </div>
-      ${p.groups.length ? `<div class="sec-title">Лоты</div>${p.groups.map((g) => `<div class="card" style="margin-bottom:10px;padding:6px"><div class="row" style="padding:8px 10px"><b class="grow">${esc(g.name)}</b><span class="pill">${g.offers.length}</span></div>${g.offers.slice(0, 8).map((o) => `<div class="offer-row" data-url="${esc(o.url)}"><span class="grow ell">${esc(o.title)}</span>${o.amount ? `<span class="dim" style="font-size:12px">${esc(o.amount)} шт</span>` : ''}<b class="price">${esc(o.price)}</b></div>`).join('')}</div>`).join('')}` : ''}
+      ${p.groups.length ? `<div class="sec-title">Лоты</div>${p.groups.map((g) => `<div class="card" style="margin-bottom:10px;padding:6px"><div class="row" style="padding:8px 10px"><b class="grow">${esc(g.name)}</b><span class="pill">${g.offers.length}</span></div><div style="max-height:380px;overflow-y:auto">${g.offers.map((o) => `<div class="offer-row" data-url="${esc(o.url)}" data-title="${esc(o.title)}" data-tip="Правый клик — скопировать ссылку"><span class="grow ell">${esc(o.title)}</span>${o.amount ? `<span class="dim" style="font-size:12px">${esc(o.amount)} шт</span>` : ''}<b class="price">${esc(o.price)}</b></div>`).join('')}</div></div>`).join('')}` : ''}
       <div class="sec-title">Отзывы</div>
       <div class="revs">${p.reviews.length ? reviews(p.reviews) : '<div class="dim">Отзывов пока нет</div>'}</div>
       ${p.cont ? '<div class="more-row"><button class="btn" data-more>Показать ещё</button></div>' : ''}
     </div>`;
+  // правый клик по лоту — скопировать ссылку / название
+  box.oncontextmenu = (e) => {
+    const o = e.target.closest('.offer-row[data-url]');
+    if (!o) return;
+    e.preventDefault();
+    const lot = { url: o.dataset.url, title: o.dataset.title };
+    lotMenu(e.clientX, e.clientY, lot, ['-', { label: 'Открыть лот', icon: 'external', run: () => S.backend.openBrowser(o.dataset.url) }]);
+  };
   box.onclick = async (e) => {
     if (e.target.closest('[data-write]')) {
       m.close();
