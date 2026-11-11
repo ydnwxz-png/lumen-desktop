@@ -3,7 +3,7 @@ import { $, $$, el, esc, avatar } from './core/util.js';
 import { icon } from './core/icons.js';
 import { S, bus, loadSettings, loadMeta, saveSettings } from './core/state.js';
 import { applyLook } from './ui/look.js';
-import { initTips, menu, err, toast } from './ui/kit.js';
+import { initTips, menu, err, toast, modal } from './ui/kit.js';
 import { palette } from './ui/palette.js';
 import { winControls } from './ui/winctl.js';
 import { closeWebPane } from './ui/webpane.js';
@@ -161,6 +161,7 @@ let updToasted = '';
 function onUpdate(st) {
   S.update = st;
   bus.emit('update', st);
+  if (st.state === 'installing') return showInstalling(st.latest);
   const b = $('[data-upd]');
   const show = { ready: `${icon('refresh', 14)}Обновить до ${st.latest}`, manual: `${icon('down', 14)}Вышла версия ${st.latest}`, available: `${icon('down', 14)}Скачать ${st.latest}`, downloading: `${icon('down', 14)}Обновление ${st.percent || 0}%` }[st.state];
   b.classList.toggle('hidden', !show);
@@ -168,13 +169,41 @@ function onUpdate(st) {
   b.dataset.tip = st.state === 'ready' ? 'Lumen перезапустится с новой версией' : st.state === 'manual' ? 'Откроется страница загрузки' : '';
   if ((st.state === 'ready' || st.state === 'manual') && updToasted !== st.latest) {
     updToasted = st.latest;
-    toast(st.state === 'ready' ? `Обновление ${st.latest} готово` : `Вышел Lumen ${st.latest}`, st.state === 'ready' ? 'Нажми, чтобы перезапустить. Или оно встанет само при выходе.' : 'Нажми, чтобы скачать', {
+    toast(st.state === 'ready' ? `Lumen ${st.latest} готов` : `Вышел Lumen ${st.latest}`, st.state === 'ready' ? 'Нажми — обновится за пару секунд, без установщика. Или само при выходе.' : 'Нажми, чтобы скачать', {
       kind: 'ok',
       icon: 'sparkles',
       ms: 9000,
       onClick: () => (st.state === 'ready' ? window.api.upd.install() : window.api.upd.download()),
     });
   }
+}
+
+/** Экран «Обновляю…» — в прошлый раз обновление скачалось, но не встало; ставим тихо при запуске. */
+function showInstalling(v) {
+  if ($('#upd-installing')) return;
+  document.body.append(el(`<div id="upd-installing" class="upd-installing"><div class="upd-box">
+    <div class="upd-spin"></div><b>Обновляю Lumen до ${esc(v || 'новой версии')}…</b>
+    <span>Пара секунд — Lumen откроется сам</span></div></div>`));
+}
+
+/** «Что нового» — один раз после обновления. */
+function mdLite(t) {
+  return t.split('\n').filter((l) => l.trim()).map((l) => {
+    const sub = /^\s{2,}[-*]\s/.test(l);
+    const txt = esc(l.replace(/^\s*[-*]\s/, '')).replace(/`([^`]+)`/g, '<code>$1</code>').replace(/\*\*([^*]+)\*\*/g, '<b>$1</b>');
+    return `<li class="${sub ? 'sub' : ''}">${txt}</li>`;
+  }).join('');
+}
+async function whatsNew() {
+  try {
+    const w = await window.api?.app?.whatsNew?.();
+    if (!w) return;
+    const m = modal(`<h3 class="wn-title">${icon('sparkles', 18)}Что нового в Lumen ${esc(w.version)}</h3>
+      <ul class="whatsnew">${mdLite(w.notes)}</ul>
+      <div class="modal-acts"><button class="btn pri" data-close>Понятно</button></div>`);
+    m.el.style.width = 'min(520px, 100%)';
+    return m;
+  } catch {}
 }
 
 function addAccount() {
@@ -322,6 +351,7 @@ async function boot() {
     window.api.app.on('upd:state', onUpdate);
     window.api.upd.state().then(onUpdate).catch(() => {});
   }
+  setTimeout(whatsNew, 1200);
   if (!started) showLogin((acc) => startAccount(acc === 'demo' ? 'demo' : acc.id));
   if (new URLSearchParams(location.search).has('demo') && !started) {
     document.querySelector('#login')?.remove();

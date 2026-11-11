@@ -28,6 +28,7 @@ contextBridge.exposeInMainWorld('api', {
   },
   app: {
     info: () => call('app:info'),
+    whatsNew: () => call('app:whatsNew'),
     clipboard: () => call('app:clipboard'),
     copy: (t) => call('app:copy', t),
     open: (url) => call('app:open', url),

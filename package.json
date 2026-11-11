@@ -1,7 +1,7 @@
 {
   "name": "lumen-desktop",
   "productName": "Lumen",
-  "version": "1.12.0",
+  "version": "1.8.0",
   "description": "Lumen — красивый десктопный клиент FunPay: чаты, сделки, лоты, шаблоны",
   "main": "main/main.js",
   "author": "Lumen",
@@ -24,7 +24,8 @@
       "renderer/**",
       "engine/**",
       "assets/**",
-      "package.json"
+      "package.json",
+      "CHANGELOG.md"
     ],
     "win": {
       "icon": "assets/icon.ico",
@@ -44,12 +45,13 @@
       ]
     },
     "nsis": {
-      "oneClick": false,
-      "allowToChangeInstallationDirectory": true,
+      "oneClick": true,
       "shortcutName": "Lumen",
       "artifactName": "Lumen-Setup-${version}.${ext}",
       "deleteAppDataOnUninstall": false,
-      "createDesktopShortcut": true
+      "createDesktopShortcut": true,
+      "perMachine": false,
+      "runAfterFinish": true
     },
     "mac": {
       "icon": "assets/icon.png",

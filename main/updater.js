@@ -1,5 +1,6 @@
 // Обновления с GitHub Releases.
-// • Установленная версия (Lumen-Setup.exe) на Windows: качает обновление сама и ставит при перезапуске (electron-updater).
+// • Установленная версия (Lumen-Setup.exe) на Windows: качает обновление в фоне и ставит ТИХО — без окон установщика:
+//   по кнопке «Перезапустить», при выходе из Lumen или в начале следующего запуска (если в прошлый раз не успели).
 // • Portable, macOS и всё остальное: проверяет последний релиз и предлагает скачать.
 // Откуда брать релизы, electron-builder записывает в resources/app-update.yml при сборке в GitHub Actions.
 // Если файла нет (собрал сам у себя) — проверка обновлений просто выключена.
@@ -14,6 +15,12 @@ let state = { state: 'idle', version: app.getVersion() };
 let au = null;
 let timer = null;
 let getSettings = () => ({});
+let hooks = { ready: () => {}, autoInstall: () => {} };
+// Скачанное, но не поставленное обновление — запоминаем, чтобы поставить при следующем запуске
+const PENDING = () => path.join(app.getPath('userData'), 'pending-update.json');
+const readPending = () => { try { return JSON.parse(fs.readFileSync(PENDING(), 'utf8')).version || ''; } catch { return ''; } };
+const writePending = (v) => { try { v ? fs.writeFileSync(PENDING(), JSON.stringify({ version: v })) : fs.unlinkSync(PENDING()); } catch {} };
+let installOnReady = false;
 
 function readRepo() {
   try {
@@ -70,10 +77,15 @@ async function check() {
   }
 }
 
-function init(onState, settingsFn) {
+function init(onState, settingsFn, h) {
   send = onState;
   getSettings = settingsFn || getSettings;
+  hooks = { ...hooks, ...(h || {}) };
   repo = readRepo();
+  const pend = readPending();
+  if (pend && !newer(pend, app.getVersion())) writePending('');   // уже обновились
+  // в прошлый раз скачали, но не поставили (выключили ПК) — ставим сразу при запуске
+  installOnReady = canAuto() && !!pend && newer(pend, app.getVersion());
   if (canAuto()) {
     try {
       au = require('electron-updater').autoUpdater;
@@ -82,13 +94,23 @@ function init(onState, settingsFn) {
       au.on('update-available', (i) => set({ state: au.autoDownload ? 'downloading' : 'available', latest: i.version, percent: 0 }));
       au.on('update-not-available', () => set({ state: 'none', checkedAt: Date.now() }));
       au.on('download-progress', (p) => set({ state: 'downloading', percent: Math.round(p.percent || 0) }));
-      au.on('update-downloaded', (i) => set({ state: 'ready', latest: i.version, checkedAt: Date.now() }));
+      au.on('update-downloaded', (i) => {
+        writePending(i.version);
+        if (installOnReady) {
+          installOnReady = false;
+          set({ state: 'installing', latest: i.version });
+          setTimeout(() => hooks.autoInstall(), 2500);   // экран «Обновляю…» и тихая установка
+          return;
+        }
+        set({ state: 'ready', latest: i.version, checkedAt: Date.now() });
+        hooks.ready(i.version);
+      });
       au.on('error', (e) => set({ state: 'error', error: String(e?.message || e).slice(0, 200) }));
     } catch {
       au = null; // нет electron-updater — работаем через проверку релиза
     }
   }
-  setTimeout(check, 15000);
+  setTimeout(check, installOnReady ? 1500 : 15000);
   clearInterval(timer);
   timer = setInterval(check, CHECK_EVERY);
 }
@@ -102,7 +124,8 @@ module.exports = {
     else if (state.url) shell.openExternal(state.url);
   },
   install: () => {
-    if (au && state.state === 'ready') au.quitAndInstall(false, true);
+    // true, true — тихо (без окна установщика) и сразу открыть новый Lumen
+    if (au && (state.state === 'ready' || state.state === 'installing')) au.quitAndInstall(true, true);
   },
   releasesUrl: () => (repo ? `https://github.com/${repo.owner}/${repo.repo}/releases` : ''),
 };

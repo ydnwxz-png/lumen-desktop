@@ -163,6 +163,22 @@ handle('upd:install', () => {
   store.flush();
   updater.install();
 });
+// «Что нового» — один раз после обновления: раздел CHANGELOG.md для текущей версии
+handle('app:whatsNew', () => {
+  const v = app.getVersion();
+  const seen = store.get('seenVersion', '');
+  if (seen === v) return null;
+  store.set('seenVersion', v);
+  if (!seen && !store.accounts().length) return null;   // самый первый запуск — без окна
+  try {
+    const md = fs.readFileSync(path.join(ROOT, 'CHANGELOG.md'), 'utf8');
+    const m = md.split(/^## /m).find((x) => x.startsWith(v));
+    const notes = m ? m.split('\n').slice(1).join('\n').trim() : '';
+    return notes ? { version: v, notes } : null;
+  } catch {
+    return null;
+  }
+});
 handle('upd:releases', () => {
   const u = updater.releasesUrl();
   if (u) shell.openExternal(u);
@@ -608,7 +624,28 @@ app.whenReady().then(() => {
   );
   createWindow();
   if (!isMac) createTray();
-  updater.init((st) => win && !win.isDestroyed() && win.webContents.send('upd:state', st), settings);
+  updater.init((st) => win && !win.isDestroyed() && win.webContents.send('upd:state', st), settings, {
+    // обновление скачалось: если Lumen свёрнут / в трее — уведомление Windows, нажал → перезапуск в новую версию
+    ready: (v) => {
+      if (win && !win.isDestroyed() && win.isVisible() && win.isFocused()) return;   // в окне и так покажется
+      if (!Notification.isSupported()) return;
+      const n = new Notification({ title: `Lumen ${v} готов`, body: 'Нажми, чтобы обновить — займёт пару секунд. Или обновится сам, когда закроешь Lumen.',
+        silent: true, icon: nativeImage.createFromPath(path.join(ROOT, 'assets', 'icon.png')) });
+      n.on('click', () => {
+        quitting = true;
+        store.flush();
+        updater.install();
+      });
+      n.show();
+    },
+    // в прошлый раз не успели поставить — ставим сразу при запуске (окно показывает «Обновляю…»)
+    autoInstall: () => {
+      quitting = true;
+      automation.detach();
+      store.flush();
+      updater.install();
+    },
+  });
   automation.init((ev) => win && !win.isDestroyed() && win.webContents.send('auto:event', ev), {
     accounts: () => store.accounts().map((a) => ({ id: a.id, userId: a.userId, username: a.username, session: sessionFor(a.id) })),
   });

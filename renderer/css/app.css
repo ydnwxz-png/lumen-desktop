@@ -394,6 +394,16 @@ html[data-idle] *, html[data-idle] *::before, html[data-idle] *::after { animati
 .later-it b { color: var(--text); font-weight: 600; white-space: nowrap; }
 .upd-chip { display: flex; align-items: center; gap: 6px; height: 26px; padding: 0 11px; border-radius: 99px; background: var(--grad); color: var(--on-accent, #fff); font-size: 12px; font-weight: 600; box-shadow: 0 4px 14px -4px rgba(var(--a-rgb), .8); animation: pop .4s var(--spring); }
 .upd-chip:hover { filter: brightness(1.1); }
+.upd-installing { position: fixed; inset: 0; z-index: 9999; display: grid; place-items: center; background: var(--bg, #0b0b10); animation: fadeIn .2s; }
+.upd-box { display: flex; flex-direction: column; align-items: center; gap: 10px; text-align: center; }
+.upd-box b { font-size: 16px; }
+.upd-box span { color: var(--text-2); font-size: 13px; }
+.upd-spin { width: 34px; height: 34px; border-radius: 50%; border: 3px solid rgba(var(--a-rgb), .25); border-top-color: rgb(var(--a-rgb)); animation: spin .8s linear infinite; }
+.wn-title { display: flex; align-items: center; gap: 8px; }
+.wn-title svg { color: var(--a2); flex: none; }
+.whatsnew { margin: 6px 0 4px; padding-left: 18px; display: flex; flex-direction: column; gap: 6px; max-height: 52vh; overflow: auto; line-height: 1.45; }
+.whatsnew li.sub { margin-left: 16px; color: var(--text-2); list-style: circle; }
+.whatsnew code { font-size: 12px; padding: 1px 5px; border-radius: 5px; background: rgba(var(--a-rgb), .12); }
 .dnd-chip { display: flex; align-items: center; gap: 6px; height: 26px; padding: 0 10px; border-radius: 99px; background: rgba(var(--a-rgb), .14); color: var(--a1); font-size: 12px; font-weight: 600; animation: pop .4s var(--spring); }
 .tpl-bar { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; padding: 2px; }
 .tpl-bar::-webkit-scrollbar { display: none; }
