@@ -13,6 +13,12 @@ const isMac = process.platform === 'darwin';
 app.setAppUserModelId('online.lumenfp.desktop');
 // Страницы плагинов открываются по адресу lumen-plugin://<id>/ — отдельно от окна приложения
 protocol.registerSchemesAsPrivileged([{ scheme: 'lumen-plugin', privileges: { standard: true, secure: true, supportFetchAPI: false } }]);
+// «Не нагружать видеокарту» (для игр): Lumen рисуется процессором, видеокарта целиком остаётся игре.
+// Читается до запуска окна, поэтому меняется только с перезапуском.
+try {
+  if ((store.get('settings', {}) || {}).noGpu) app.disableHardwareAcceleration();
+} catch {}
+
 const gotLock = app.requestSingleInstanceLock();
 if (!gotLock) app.quit();
 
@@ -453,6 +459,7 @@ function placeToast(h) {
 }
 
 async function toast(p) {
+  clearTimeout(toastKill);
   const w = toastWindow();
   await toastReady;
   toastCorner = p.corner || 'br';
@@ -462,7 +469,15 @@ async function toast(p) {
 ipcMain.on('toast:size', (_e, h) => placeToast(+h || 0));
 ipcMain.on('toast:mouse', () => {});
 ipcMain.on('toast:click', (_e, node) => showMain(node));
-ipcMain.on('toast:empty', () => placeToast(0));
+let toastKill = null;
+ipcMain.on('toast:empty', () => {
+  placeToast(0);
+  // пустое окно уведомлений не держим: через 20 с закрываем, при новом уведомлении создастся заново
+  clearTimeout(toastKill);
+  toastKill = setTimeout(() => {
+    if (toastWin && !toastWin.isDestroyed() && !toastWin.isVisible()) toastWin.destroy();
+  }, 20000);
+});
 
 // Вход через браузер: обычная страница входа FunPay, ловим куку golden_key.
 function loginViaBrowser() {

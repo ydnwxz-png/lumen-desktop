@@ -187,18 +187,13 @@ function notif(w) {
     sound();
   };
   const test = el(`<button class="btn sm">${icon('play', 14)}Проверить</button>`);
-  test.onclick = () => {
-    const was = S.focused;
-    S.focused = false;
-    notify({ title: 'darkness21', name: 'darkness21', body: 'Привет! Это тестовое уведомление Lumen ✨', avatar: '', node: null, kind: 'msg' });
-    S.focused = was;
-  };
+  test.onclick = () => notify({ title: 'darkness21', name: 'darkness21', body: 'Привет! Это тестовое уведомление Lumen ✨', avatar: '', node: null, kind: 'msg', test: true });
   w.append(
     group(
       row('Вид', 'Lumen — красивые карточки, Системные — как у Windows', segEl([['lumen', 'Lumen'], ['system', 'Системные'], ['off', 'Выкл']], n.mode, (v) => set((s) => (s.notify.mode = v)))),
       row('Угол экрана', 'Для уведомлений Lumen', segEl([['tl', '↖'], ['tr', '↗'], ['bl', '↙'], ['br', '↘']], n.corner, (v) => set((s) => (s.notify.corner = v)))),
       row('Показывать текст', 'Иначе просто «Новое сообщение»', sw(n.preview, (v) => set((s) => (s.notify.preview = v)))),
-      row('Когда окно открыто', 'Тоже показывать всплывашку внутри окна', sw(n.whenFocused, (v) => set((s) => (s.notify.whenFocused = v)))),
+      row('Всплывашка и в «Чатах»', 'В других разделах Lumen всплывашка приходит всегда. Включи — будет и когда сидишь в «Чатах»', sw(n.whenFocused, (v) => set((s) => (s.notify.whenFocused = v)))),
       row('Новые заказы', 'Отдельное уведомление со своим звуком', sw(n.orders, (v) => set((s) => (s.notify.orders = v)))),
       row('Со всех аккаунтов', 'Сообщения и заказы на других добавленных аккаунтах — даже когда сидишь на одном', sw(n.allAccounts !== false, (v) => set((s) => (s.notify.allAccounts = v)))),
       row('Тест', '', test)
@@ -376,7 +371,12 @@ async function sys(w) {
       row('Крестик сворачивает в трей', 'Чтобы закрыть совсем — правый клик по значку в трее', sw(S.settings.tray, (v) => set((s) => (s.tray = v)))),
       row('Запускать свёрнутым', '', sw(S.settings.startMinimized, (v) => set((s) => (s.startMinimized = v)))),
       row('Enter — отправить', 'Иначе Ctrl+Enter, а Enter — новая строка', sw(S.settings.sendOnEnter, (v) => set((s) => (s.sendOnEnter = v)))),
-      row('Как часто проверять сообщения', 'Чаще — быстрее, но больше запросов к FunPay', iv)
+      row('Как часто проверять сообщения', 'Чаще — быстрее, но больше запросов к FunPay', iv),
+      row('Не нагружать видеокарту (для игр)', 'Если в играх падает FPS — включи: Lumen будет рисоваться процессором, вся видеокарта остаётся игре. Сработает после перезапуска Lumen',
+        sw(S.settings.noGpu, (v) => {
+          set((s) => (s.noGpu = v));
+          toast('Перезапусти Lumen', 'Настройка видеокарты применится после перезапуска', { kind: 'info', ms: 4000 });
+        }))
     )
   );
   const reset = el(`<button class="btn danger sm">Сбросить</button>`);

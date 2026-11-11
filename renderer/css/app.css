@@ -760,3 +760,4 @@ body:has(#login) #app { visibility: hidden; }
 .sp-tk .dim { flex: 1; min-width: 0; }
 .sp-tk.bad { background: rgba(248, 113, 113, .08); }
 .sp-tk.bad > svg { color: var(--bad); }
+::-webkit-scrollbar-corner { background: transparent; }

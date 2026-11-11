@@ -3,6 +3,7 @@ import { S } from '../core/state.js';
 import { toast } from '../ui/kit.js';
 import { avatar, esc } from '../core/util.js';
 import { icon } from '../core/icons.js';
+import { nlog, reallyFocused } from './poller.js';
 
 let ac;
 // Звуки собираются синтезатором прямо в приложении — без файлов. Нота: [частота, старт(с), длина(с), форма, громкость, скольжение-до]
@@ -57,11 +58,15 @@ const themeColors = () => {
 /** p: {title, body, avatar, node, kind:'msg'|'order'} */
 export function notify(p) {
   const n = S.settings.notify;
-  if (n.mode === 'off') return;
+  const log = (r) => !p.test && nlog(p.name || p.title, p.body, r);
+  if (n.mode === 'off') return log('пропущено: уведомления выключены');
   const body = n.preview || p.raw ? p.body : 'Новое сообщение';
   sound(p.kind);
-  if (S.focused || !window.api) {
-    if (S.focused && !n.whenFocused && p.kind !== 'order') return;
+  const focused = p.test ? false : reallyFocused();
+  if (focused || !window.api) {
+    // в «Чатах» и так видно новое сообщение в списке; в других разделах — всплывашка обязательно
+    if (focused && !n.whenFocused && p.kind !== 'order' && S.view === 'chats') return log('ты в «Чатах» — только звук и счётчик');
+    log('показано в окне Lumen');
     toast(p.title, body, {
       html: p.kind === 'order' ? `<span class="tic" style="background:rgba(52,211,153,.15);color:var(--ok)">${icon('cash', 17)}</span>` : avatar(p.avatar, p.name || p.title, 34),
       onClick: () => p.onClick?.(),
@@ -70,6 +75,7 @@ export function notify(p) {
     return;
   }
   window.api.app.flash();
+  log(n.mode === 'system' ? 'показано (Windows)' : 'показано');
   if (n.mode === 'system') window.api.app.notify({ title: p.title, body, node: p.node });
   else window.api.app.toast({ title: p.title, body, avatar: p.avatar, name: p.name || p.title, node: p.node, kind: p.kind, corner: n.corner, theme: themeColors() });
 }

@@ -12,6 +12,29 @@ let timer = null;
 let running = false;
 let again = false;
 let gen = 0;
+let startedAt = 0;
+
+// Журнал последних входящих: что показали и почему пропустили (Настройки → Уведомления)
+export const NLOG = [];
+export function nlog(name, text, result) {
+  NLOG.unshift({ t: Date.now(), name, text: String(text || '').slice(0, 80), result });
+  NLOG.length = Math.min(NLOG.length, 30);
+  bus.emit('nlog');
+}
+
+/** Окно Lumen реально перед глазами (а не свёрнуто / в трее / за игрой) */
+export const reallyFocused = () => !!S.focused && document.hasFocus() && document.visibilityState === 'visible';
+
+// Сторож: если запрос к FunPay завис (сеть, сон ПК) — опрос не должен остановиться навсегда
+setInterval(() => {
+  if (running && startedAt && Date.now() - startedAt > 75000) {
+    gen++;
+    running = false;
+    again = false;
+    status('err', 'FunPay долго не отвечал — переподключаюсь');
+    loop();
+  }
+}, 15000);
 
 export const setOpenProvider = (fn) => (provider = fn);
 
@@ -50,9 +73,15 @@ function status(s, e = '') {
 }
 
 async function loop() {
-  if (!S.backend) return;
+  if (!S.backend) {
+    // аккаунт ещё подключается — не бросаем опрос, пробуем позже
+    clearTimeout(timer);
+    timer = setTimeout(loop, 2000);
+    return;
+  }
   const my = gen;
   running = true;
+  startedAt = Date.now();
   try {
     const { node, lastId } = provider();
     const r = await S.backend.poll(node, lastId);
@@ -68,7 +97,7 @@ async function loop() {
   }
   if (my !== gen) return;
   const base = Math.max(2, +S.settings.pollInterval || 3) * 1000;
-  const wait = again ? 50 : CS.status === 'err' ? Math.min(30000, base * 3) : S.focused ? base : base * 1.6;
+  const wait = again ? 50 : CS.status === 'err' ? Math.min(30000, base * 3) : reallyFocused() ? base : base * 1.6;
   again = false;
   clearTimeout(timer);
   timer = setTimeout(loop, wait);
@@ -100,7 +129,7 @@ function handleChats(list) {
   bus.emit('chats', list);
   badge(list.filter((c) => c.unread && !meta(c.id).muted && !meta(c.id).archived).length);
   for (const f of fresh) incoming(f.c, f.isNew);
-  if (readElsewhere.length) checkReadElsewhere(readElsewhere.slice(0, 5));
+  if (readElsewhere.length) checkReadElsewhere(readElsewhere.slice(0, 10));
 }
 
 // Чаты, где новое сообщение кто-то уже прочитал. /chat/history не отмечает чат прочитанным.
@@ -112,13 +141,24 @@ async function checkReadElsewhere(items) {
     if (checking.has(c.id) || !S.backend?.history) continue;
     checking.add(c.id);
     try {
-      const r = await S.backend.history(c.id);
+      // FunPay иногда не отвечает с первого раза — раньше такое уведомление терялось молча, теперь 3 попытки
+      let r = null;
+      for (let i = 0; i < 3 && !r; i++) {
+        try {
+          r = await S.backend.history(c.id);
+        } catch (e) {
+          if (i === 2) throw e;
+          await new Promise((res) => setTimeout(res, 3000 * (i + 1)));
+          if (my !== gen) return;
+        }
+      }
       if (my !== gen) return;
       // только чужие (покупатель или FunPay об оплате); свои и ответы бота с твоего аккаунта — пропускаем
       const news = (r.messages || []).filter((m) => m.id > prev && m.id <= c.nodeMsg && String(m.authorId) !== me);
       const m = news[news.length - 1];
       if (m) incoming({ ...c, preview: m.text || (m.image ? 'Изображение' : c.preview) }, isNew);
-    } catch {
+    } catch (e) {
+      nlog(c.name, c.preview, 'не проверил чат: ' + (e.message || 'нет связи'));
     } finally {
       checking.delete(c.id);
     }
@@ -129,9 +169,12 @@ function incoming(c, isNew) {
   const m = meta(c.id);
   const isOrder = /оплатил заказ|paid for order/i.test(c.preview);
   bus.emit('incoming', c);
-  const open = provider().node === c.id && S.focused && S.view === 'chats';
+  const open = provider().node === c.id && reallyFocused() && S.view === 'chats';
   const dnd = dndTick();
   if (dnd) dndIncoming(c);
+  if (m.muted) nlog(c.name, c.preview, 'пропущено: чат без звука');
+  else if (open) nlog(c.name, c.preview, 'чат открыт — уведомление не нужно');
+  else if (dnd) nlog(c.name, c.preview, 'пропущено: «Не беспокоить»');
   if (!m.muted && !open && !dnd) {
     const order = isOrder && S.settings.notify.orders;
     notify({

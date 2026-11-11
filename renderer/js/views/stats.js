@@ -155,12 +155,14 @@ function calendar(st, from, to) {
 }
 
 /** Горизонтальные полоски для разделов/товаров: имя, полоска доли, количество и сумма. */
-function hbars(rows, cur, total, { click = '' } = {}) {
+const cut = (t, n) => { const a = Array.from(String(t || '')); return a.length > n ? a.slice(0, n).join('').trimEnd() + '…' : a.join(''); };
+
+function hbars(rows, cur, total, { click = '', lines = 1 } = {}) {
   const max = Math.max(1, ...rows.map((r) => r.sum || r.n));
   return rows
     .map(
       (r) => `<div class="st-hr" ${click && r.id ? `${click}="${esc(r.id)}"` : ''} data-st="${esc(`${r.name}: ${r.n} ${plural(r.n, 'заказ', 'заказа', 'заказов')} · ${money(r.sum, cur)}${total ? ` · ${Math.round((r.sum / total) * 100)}% выручки` : ''}`)}">
-        <div class="st-hr-t"><span class="ell">${esc(r.name)}</span><b>${money(r.sum, cur)}</b></div>
+        <div class="st-hr-t"><span class="${lines > 1 ? 'l2' : 'ell'}">${esc(r.name)}</span><b>${money(r.sum, cur)}</b></div>
         <div class="st-hr-b"><i style="width:${Math.max(2, ((r.sum || r.n) / max) * 100)}%"></i></div>
         <div class="st-hr-s">${r.n} ${plural(r.n, 'заказ', 'заказа', 'заказов')}${r.last ? ` · последний ${dshort(r.last)}` : ''}</div></div>`
     )
@@ -191,7 +193,9 @@ const CSS = `<style>
 .st-card{padding:14px 16px 12px;border-radius:16px;background:var(--surface-2);border:1px solid var(--line);margin-top:12px}
 .st-card h4{margin:0 0 2px;font-size:13.5px}
 .st-card .sub{font-size:12px;color:var(--text-3);margin-bottom:10px}
-.st-two{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.st-two{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:12px}
+.st-two>*{min-width:0}
+.st-wrap{overflow-x:hidden}
 .st-two .st-card{margin-top:12px}
 .st-cols-wrap{padding-left:40px}
 .st-cols{position:relative;display:flex;align-items:flex-end;gap:3px}
@@ -214,6 +218,8 @@ const CSS = `<style>
 .st-hr[data-buyer]:hover .st-hr-t span{text-decoration:underline}
 .st-hr-t{display:flex;gap:10px;font-size:13px}
 .st-hr-t span{flex:1;min-width:0}
+.st-hr-t span.l2{white-space:normal;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;line-height:1.35}
+.st-hr-t b{flex:none;white-space:nowrap}
 .st-hr-b{height:6px;border-radius:99px;background:var(--surface-3);margin:5px 0 3px;overflow:hidden}
 .st-hr-b i{display:block;height:100%;border-radius:99px;background:var(--a1)}
 .st-hr-s{font-size:11.5px;color:var(--text-3)}
@@ -328,7 +334,7 @@ export function openStats() {
         ${k('Покупателей', String(st.buyers.size), st.repeat ? `${st.repeat} ${plural(st.repeat, 'купил', 'купили', 'купили')} больше одного раза` : '', pv && delta(st.buyers.size, pv.buyers.size))}
         ${k('Возвраты', String(st.refunds), st.refunds ? `${refundPct}% заказов · ${money(st.refundSum, cur)}` : 'нет', pv && delta(st.refunds, pv.refunds, { good: 'down' }))}
         ${k('Лучший день', best ? money(best[1].sum, cur) : '—', best ? `${dshort(best[0])} · ${best[1].n} ${plural(best[1].n, 'заказ', 'заказа', 'заказов')}` : '')}
-        ${k('Самая дорогая продажа', st.max ? money(st.max.amount, cur) : '—', st.max ? esc(st.max.desc.slice(0, 40)) : '')}
+        ${k('Самая дорогая продажа', st.max ? money(st.max.amount, cur) : '—', st.max ? esc(cut(st.max.desc, 40)) : '')}
       </div>
       ${vs && pv ? `<div class="st-foot" style="margin:-4px 0 4px">▲▼ — ${vs}</div>` : ''}
       ${
@@ -342,11 +348,11 @@ export function openStats() {
         ${hasHours ? `<div class="st-card"><h4>Время покупок</h4><div class="sub">Чаще всего — с ${hourMax}:00 до ${hourMax + 1}:00. Будь на связи и поднимай лоты в это время</div>${columns(hours, { h: 150, labelsEvery: 3, highlight: hourMax })}</div>` : ''}
         <div class="st-card"><h4>Дни недели</h4><div class="sub">Больше всего заказов — ${['в понедельник', 'во вторник', 'в среду', 'в четверг', 'в пятницу', 'в субботу', 'в воскресенье'][wdMax]}</div>${columns(wds, { h: 150, highlight: wdMax })}</div>
       </div>
+      <div class="st-card"><h4>Товары</h4><div class="sub">Самые прибыльные лоты. Наведи — полное название</div>${hbars(goods, cur, st.revenue, { lines: 2 })}</div>
       <div class="st-two">
         <div class="st-card"><h4>Разделы</h4><div class="sub">Где больше всего зарабатываешь</div>${hbars(cats, cur, st.revenue)}</div>
-        <div class="st-card"><h4>Товары</h4><div class="sub">Самые прибыльные лоты</div>${hbars(goods, cur, st.revenue)}</div>
+        <div class="st-card"><h4>Покупатели</h4><div class="sub">Кто принёс больше всего. Нажми — профиль</div>${hbars(buyers, cur, st.revenue, { click: 'data-buyer' })}</div>
       </div>
-      <div class="st-card"><h4>Покупатели</h4><div class="sub">Кто принёс больше всего. Нажми — откроется профиль</div>${hbars(buyers, cur, st.revenue, { click: 'data-buyer' })}</div>
       <div class="st-foot">Посчитано по ${st.list.length} ${plural(st.list.length, 'продаже', 'продажам', 'продажам')} за период${st.otherCur ? ` · ${st.otherCur} в другой валюте — в суммы не вошли` : ''}${raw.partial ? ' · FunPay попросил подождать, поэтому загружены не все — нажми ↻ через минуту' : ''}</div>`;
     // покупатели без id профиля — не кликаются
     body.querySelectorAll('[data-buyer=""]').forEach((x) => x.removeAttribute('data-buyer'));

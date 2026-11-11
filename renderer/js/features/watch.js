@@ -62,11 +62,29 @@ async function checkAccount(a) {
   const chats = await client.chats();
   const prevMap = known.get(a.id);
   const map = new Map();
+  let checks = 0; // не больше 5 проверок истории за проход — чтобы FunPay не ругался на частые запросы
   for (const c of chats) {
     map.set(c.id, c.nodeMsg);
     if (!prevMap) continue; // первый проход — только запоминаем
     const prev = prevMap.get(c.id);
-    if (!c.unread || (prev !== undefined && c.nodeMsg <= prev)) continue;
+    if (prev !== undefined && c.nodeMsg <= prev) continue;
+    if (!c.unread) {
+      if (checks++ >= 5) {
+        if (prev !== undefined) map.set(c.id, prev); // проверим в следующий проход
+        continue;
+      }
+      // уже прочитано (бот вроде Cardinal ответил, телефон, сайт) — смотрим, писал ли покупатель
+      try {
+        const r = await client.history(c.id);
+        const myId = String(me?.userId || '');
+        const news = (r.messages || []).filter((m) => m.id > (prev || 0) && m.id <= c.nodeMsg && String(m.authorId) !== myId);
+        const m = news[news.length - 1];
+        if (!m) continue;
+        c.preview = m.text || (m.image ? 'Изображение' : c.preview);
+      } catch {
+        continue;
+      }
+    }
     const isOrder = /оплатил заказ|paid for order/i.test(c.preview);
     const order = isOrder && S.settings.notify.orders;
     const who = me?.username || a.username || 'другой аккаунт';
