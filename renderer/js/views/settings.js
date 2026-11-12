@@ -9,12 +9,13 @@ import { VARS } from '../features/templates.js';
 import { sound, notify, SOUNDS } from '../features/notify.js';
 import { applyLook } from '../ui/look.js';
 import { dndTick, dndOn, dndOff } from '../features/later.js';
+import { syncDiscord } from '../features/discord.js';
 
 const SECTIONS = [
   ['look', 'Внешний вид', 'palette'],
-  ['nick', 'Редактор ника', 'sparkles'],
+  ['nick', 'Ник Lumen FX', 'sparkles'],
+  ['chat', 'Чаты и шаблоны', 'chat'],
   ['notify', 'Уведомления', 'bell'],
-  ['tpl', 'Шаблоны', 'zap'],
   ['ai', 'ИИ-помощник', 'wand'],
   ['acc', 'Аккаунты', 'users'],
   ['sys', 'Система', 'monitor'],
@@ -64,13 +65,14 @@ function segEl(opts, value, onChange) {
 const sw = (on, fn) => switchEl(on, fn);
 
 function show(sec) {
+  if (sec === 'tpl') sec = 'chat'; // старая ссылка на «Шаблоны»
   cur = sec;
   root.querySelectorAll('[data-s]').forEach((b) => b.classList.toggle('on', b.dataset.s === sec));
   page.innerHTML = '';
   page.scrollTop = 0;
   const wrap = el('<div class="stagger"></div>');
   page.append(wrap);
-  ({ look, nick, notify: notif, tpl, ai, acc, sys, about })[sec](wrap);
+  ({ look, nick, chat, notify: notif, ai, acc, sys, about })[sec](wrap);
 }
 
 function head(w, t, sub) {
@@ -230,8 +232,23 @@ function notif(w) {
   );
 }
 
-function tpl(w) {
-  head(w, 'Шаблоны', 'Кнопки над полем ввода. Alt+1…9 — быстрая вставка, «/» в начале сообщения — поиск.');
+// Чаты: как отправлять, как часто проверять + шаблоны ответов
+function chat(w) {
+  head(w, 'Чаты и шаблоны', 'Отправка сообщений, проверка новых и готовые ответы.');
+  const iv = el(`<div class="seg">${[2, 3, 5, 8].map((v) => `<button data-v="${v}">${v} с</button>`).join('')}</div>`);
+  seg(iv, String(S.settings.pollInterval), (v) => set((s) => (s.pollInterval = +v)));
+  w.append(
+    group(
+      row('Enter — отправить', 'Иначе Ctrl+Enter, а Enter — новая строка', sw(S.settings.sendOnEnter, (v) => set((s) => (s.sendOnEnter = v)))),
+      row('Как часто проверять сообщения', 'Чаще — быстрее, но больше запросов к FunPay', iv)
+    )
+  );
+  w.append(el(`<div class="sec-title">Шаблоны</div>`), el(`<div class="dim" style="font-size:12.5px;margin:-4px 2px 10px">Кнопки над полем ввода. Alt+1…9 — быстрая вставка, «/» в начале сообщения — поиск.</div>`));
+  tpl(w, true);
+}
+
+function tpl(w, inChat = false) {
+  if (!inChat) head(w, 'Шаблоны', 'Кнопки над полем ввода. Alt+1…9 — быстрая вставка, «/» в начале сообщения — поиск.');
   const vars = el(`<div class="vars">${VARS.map(([v, d]) => `<span class="var" data-tip="${d}">${v}</span>`).join('')}</div>`);
   const g = el('<div class="set-group"></div>');
   let lastTa = null;
@@ -361,17 +378,29 @@ async function acc(w) {
 }
 
 async function sys(w) {
-  head(w, 'Система', 'Запуск, трей и опрос FunPay.');
+  head(w, 'Система', 'Запуск, трей, игры и Discord.');
   const auto = window.api ? await window.api.app.autostart().catch(() => false) : false;
-  const iv = el(`<div class="seg">${[2, 3, 5, 8].map((v) => `<button data-v="${v}">${v} с</button>`).join('')}</div>`);
-  seg(iv, String(S.settings.pollInterval), (v) => set((s) => (s.pollInterval = +v)));
   w.append(
     group(
       row('Запускать вместе с Windows', 'Сразу в трей, сообщения приходят в фоне', sw(auto, (v) => window.api?.app.autostart(v))),
       row('Крестик сворачивает в трей', 'Чтобы закрыть совсем — правый клик по значку в трее', sw(S.settings.tray, (v) => set((s) => (s.tray = v)))),
-      row('Запускать свёрнутым', '', sw(S.settings.startMinimized, (v) => set((s) => (s.startMinimized = v)))),
-      row('Enter — отправить', 'Иначе Ctrl+Enter, а Enter — новая строка', sw(S.settings.sendOnEnter, (v) => set((s) => (s.sendOnEnter = v)))),
-      row('Как часто проверять сообщения', 'Чаще — быстрее, но больше запросов к FunPay', iv),
+      row('Запускать свёрнутым', '', sw(S.settings.startMinimized, (v) => set((s) => (s.startMinimized = v))))
+    )
+  );
+  // Discord
+  const dc = () => (S.settings.discord ||= { on: false, nick: false });
+  const dcOk = window.api?.app?.discordAvailable ? await window.api.app.discordAvailable().catch(() => false) : false;
+  w.append(
+    el(`<div class="sec-title">Discord</div>`),
+    group(
+      row('Активность в Discord', dcOk ? 'В профиле Discord будет «Играет в Lumen» с кнопкой «Скачать». Discord должен быть запущен на этом компьютере' : 'Скоро — функция ещё настраивается',
+        dcOk ? sw(dc().on, (v) => (set((s) => (dc().on = v)), syncDiscord())) : el('<span class="dim">—</span>')),
+      ...(dcOk ? [row('Показывать мой ник FunPay', 'Иначе просто «Lumen Desktop — помощник продавца»', sw(dc().nick, (v) => (set((s) => (dc().nick = v)), syncDiscord())))] : [])
+    )
+  );
+  w.append(
+    el(`<div class="sec-title">Игры</div>`),
+    group(
       row('Не нагружать видеокарту (для игр)', 'Если в играх падает FPS — включи: Lumen будет рисоваться процессором, вся видеокарта остаётся игре. Сработает после перезапуска Lumen',
         sw(S.settings.noGpu, (v) => {
           set((s) => (s.noGpu = v));

@@ -87,6 +87,9 @@ async function syncMode(mode) {
 
 async function detach() {
   if (cur?.engine.running) await cur.engine.stop().catch(() => {});
+  try {
+    cur?.engine.plugins.flush();
+  } catch {}
   cur = null;
 }
 

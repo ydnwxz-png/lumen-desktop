@@ -8,6 +8,7 @@ import { CS, openNode } from './poller.js';
 
 let root;
 let pages = []; // [{id, name, title, icon}]
+let reloadFrames = false; // сменили аккаунт — страницы плагинов перезагрузим, когда автоматика подключится
 const frames = new Map(); // id -> iframe
 const AUTO = () => window.__autoMock || window.api?.auto;
 const pageUrl = (id) => AUTO()?.pageUrl?.(id) || `lumen-plugin://${id}/`;
@@ -16,13 +17,15 @@ export function mountPluginPages(c) {
   root = c;
   root.innerHTML = '';
   bus.on('auto-info', syncPluginRail);
-  bus.on('account', () => syncPluginRail(null));
+  // плагины общие для всех аккаунтов: при смене аккаунта не прячем их, а обновляем страницы
+  bus.on('account', () => (reloadFrames = true));
   addEventListener('message', onMessage);
   // тема поменялась — перекрашиваем страницы плагинов
   new MutationObserver(() => frames.forEach(sendTheme)).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme', 'data-accent', 'style'] });
 }
 
 export function syncPluginRail(info) {
+  if (!info) return; // автоматика ещё подключается (смена аккаунта) — оставляем как было
   const list = (info?.plugins || []).filter((p) => p.on && p.page && !p.error).map((p) => ({ id: p.id, name: p.name, title: p.page.title, icon: p.page.icon }));
   const same = JSON.stringify(list) === JSON.stringify(pages);
   pages = list;
@@ -38,7 +41,12 @@ export function syncPluginRail(info) {
       })
       .join('');
   $$('.rail-btn[data-nav]', rail).forEach((b) => b.classList.toggle('on', b.dataset.nav === S.view));
-  if (S.view?.startsWith('plug:') && !pages.some((p) => 'plug:' + p.id === S.view)) showPluginPage(S.view.slice(5));
+  if (reloadFrames) {
+    reloadFrames = false;
+    frames.forEach((f) => (f.src = pageUrl([...frames].find(([, x]) => x === f)[0])));
+  }
+  // открыта страница плагина — показываем её (или «выключен», если плагин правда выключили)
+  if (S.view?.startsWith('plug:')) showPluginPage(S.view.slice(5));
 }
 
 export function showPluginPage(id) {

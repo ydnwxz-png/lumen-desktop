@@ -122,6 +122,7 @@ export class Engine extends EventEmitter {
     await this.plugins.call('onStop', {});
     this.state.flush();
     this.cfgStore.flush();
+    this.plugins.flush();
     this.setStatus('stopped');
     this.log('info', 'Автоматика остановлена');
   }

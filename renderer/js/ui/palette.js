@@ -36,7 +36,7 @@ export function palette() {
     { t: 'Поднять все лоты', ic: 'rocket', run: () => raiseDue(true).then(() => ok('Готово', 'Подробности — в разделе «Лоты»')) },
     { t: 'Обновить чаты', ic: 'refresh', run: () => pollNow() },
     { t: 'Сменить тему', ic: 'moon', run: () => ((S.settings.theme = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark'), saveSettings(), applyLook()) },
-    { t: 'Шаблоны', ic: 'zap', run: () => bus.emit('nav', 'settings', 'tpl') },
+    { t: 'Шаблоны', ic: 'zap', run: () => bus.emit('nav', 'settings', 'chat') },
     { t: 'Открыть FunPay в браузере', ic: 'globe', run: () => S.backend.openBrowser('https://funpay.com/') },
   ];
 

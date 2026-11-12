@@ -17,17 +17,42 @@ export class Plugins {
     this.e = engine;
     this.dir = dir;
     this.list = new Map(); // id -> { id, file, plugin, meta, error, store }
+    // Вкл/выкл, настройки и данные плагинов — общие для всех аккаунтов (раньше были у каждого аккаунта свои,
+    // и при смене аккаунта плагин «выключался»). Переносим старые настройки текущего аккаунта один раз.
+    this.shared = new Store(path.join(dir, '.lumen', 'plugins.json'), { plugins: {} });
+    const old = engine.cfg?.plugins || {};
+    let moved = false;
+    for (const [id, c] of Object.entries(old)) {
+      if (!this.shared.data.plugins[id]) {
+        this.shared.data.plugins[id] = c;
+        moved = true;
+      }
+    }
+    if (moved) this.shared.flush();
+  }
+
+  get conf() {
+    return this.shared.data.plugins;
+  }
+
+  saveConf() {
+    this.shared.save();
+  }
+
+  flush() {
+    this.shared.flush();
+    for (const p of this.list.values()) if (p.store?.timer) p.store.flush();
   }
 
   cfg(id) {
-    const c = this.e.cfg.plugins;
+    const c = this.conf;
     c[id] ||= { on: false, settings: {} };
     c[id].settings ||= {};
     return c[id];
   }
 
   enabled(id) {
-    return !!this.e.cfg.plugins[id]?.on && !this.list.get(id)?.error;
+    return !!this.conf[id]?.on && !this.list.get(id)?.error;
   }
 
   settings(id) {
@@ -68,7 +93,15 @@ export class Plugins {
         // своя страница в меню слева: page: { title, icon, html }
         page: p.page && typeof p.page.html === 'string' ? { title: String(p.page.title || p.name || id), icon: String(p.page.icon || 'layers') } : null,
       };
-      const entry = { id, file, plugin: p, meta, error: null, store: new Store(path.join(this.e.dir, 'plugins-data', id + '.json'), {}) };
+      const dataFile = path.join(this.dir, '.lumen', 'data', id + '.json');
+      const oldFile = path.join(this.e.dir, 'plugins-data', id + '.json');
+      if (!fs.existsSync(dataFile) && fs.existsSync(oldFile)) {
+        try {
+          fs.mkdirSync(path.dirname(dataFile), { recursive: true });
+          fs.copyFileSync(oldFile, dataFile);
+        } catch {}
+      }
+      const entry = { id, file, plugin: p, meta, error: null, store: new Store(dataFile, {}) };
       this.list.set(id, entry);
       return entry;
     } catch (err) {
@@ -153,7 +186,7 @@ export class Plugins {
     if (on && p.error) throw new Error('Плагин с ошибкой: ' + p.error);
     const was = this.enabled(id);
     this.cfg(id).on = !!on;
-    this.e.saveCfg();
+    this.saveConf();
     try {
       if (on && !was && p.plugin.onStart) await withTimeout(Promise.resolve(p.plugin.onStart({}, this.api(id))), TIMEOUT);
       if (!on && was && p.plugin.onStop) await withTimeout(Promise.resolve(p.plugin.onStop({}, this.api(id))), TIMEOUT);
@@ -164,7 +197,7 @@ export class Plugins {
 
   setSetting(id, key, value) {
     this.cfg(id).settings[key] = value;
-    this.e.saveCfg();
+    this.saveConf();
   }
 
   /** Установить плагин из кода. Новый плагин выключен, пока его не включат. */
@@ -189,8 +222,8 @@ export class Plugins {
       fs.unlinkSync(path.join(this.dir, p.file));
     } catch {}
     this.list.delete(id);
-    delete this.e.cfg.plugins[id];
-    this.e.saveCfg();
+    delete this.conf[id];
+    this.saveConf();
   }
 
   /** Команды для Telegram от включённых плагинов: { '/cmd': {id, fn} } */

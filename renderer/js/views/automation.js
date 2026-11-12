@@ -6,6 +6,11 @@ import { seg, switchEl, modal, confirmBox, err, ok, toast, busy } from '../ui/ki
 import { notify } from '../features/notify.js';
 
 const VARS = ['$username', '$welcome', '$order_id', '$order_link', '$lot_name', '$price', '$product', '$stars', '$my_name', '$date', '$time'];
+// группы на странице: что относится к общению, что — к заказам
+const GROUPS = [
+  ['orders', 'Заказы и лоты', ['delivery', 'restore', 'blacklist']],
+  ['msg', 'Сообщения покупателям', ['greeting', 'commands', 'reviews', 'thanks', 'remind']],
+];
 const FEATURES = [
   ['delivery', 'Автовыдача', 'box', 'Покупатель оплатил — товар уходит сам. Ключи, аккаунты, ссылки — из списка.', editDelivery],
   ['commands', 'Автоответы', 'chat', 'Ответы на команды и частые вопросы: «!цена», «есть в наличии?»…', editCommands],
@@ -136,7 +141,7 @@ function draw(p) {
       <div class="stat"><div class="lbl">${icon('chat', 15)}Автоответов</div><div class="val">${t.commands || 0}</div></div>
       <div class="stat"><div class="lbl">${icon('layers', 15)}Плагинов включено</div><div class="val">${inf.plugins || 0}</div></div>
     </div>
-    <div class="feat-grid stagger" data-feats></div>
+    <div data-feats></div>
     <div class="page-head" style="margin:26px 0 12px"><h2 style="margin:0;font-size:19px">Плагины</h2><span class="grow"></span>
       <button class="btn sm" data-pfolder>${icon('folder', 15)}Папка</button>
       <button class="btn sm" data-preload>${icon('refresh', 15)}Перезагрузить</button>
@@ -145,8 +150,14 @@ function draw(p) {
     <div class="plug-grid stagger" data-plugins></div>
     <div class="sec-title">Журнал</div>
     <div class="card auto-log" data-log></div>`;
-  const grid = $('[data-feats]', body);
+  const feats = $('[data-feats]', body);
+  const grids = {};
+  for (const [g, title] of GROUPS) {
+    feats.append(el(`<div class="sec-title">${title}</div>`));
+    feats.append((grids[g] = el('<div class="feat-grid stagger"></div>')));
+  }
   for (const [key, name, ic, desc, edit] of FEATURES) {
+    const grid = grids[GROUPS.find((x) => x[2].includes(key))?.[0] || 'msg'];
     const c = cfg[key];
     const isOn = key === 'blacklist' ? (c.users || []).length > 0 : !!c.on;
     const sub = key === 'delivery' ? `${c.rules.length} ${c.rules.length === 1 ? 'правило' : 'правил'}` : key === 'commands' ? `${c.rules.length} шт.` : key === 'blacklist' ? `${(c.users || []).length} чел.` : '';

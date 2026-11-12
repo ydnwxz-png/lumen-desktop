@@ -33,6 +33,7 @@ export const DEFAULT_SETTINGS = {
   autoUpdate: true,
   tray: true,
   startMinimized: false,
+  discord: { on: false, nick: false }, // активность в Discord
   myNick: { style: 'aurora', c1: '#a78bfa', c2: '#22d3ee' },
   templatesBar: true,
   sendOnEnter: true,

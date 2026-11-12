@@ -13,6 +13,7 @@ let running = false;
 let again = false;
 let gen = 0;
 let startedAt = 0;
+let slow = 0; // после 429 опрашиваем реже, потом постепенно возвращаемся
 
 // Журнал последних входящих: что показали и почему пропустили (Настройки → Уведомления)
 export const NLOG = [];
@@ -43,6 +44,10 @@ export async function start() {
   gen++;
   first = true;
   known.clear();
+  // новый аккаунт: сбрасываем статус, иначе «На связи» после первого опроса не покажется
+  // (надпись так и висела «Подключаюсь…», хотя всё работало)
+  CS.status = 'load';
+  CS.error = '';
   CS.chats = [];
   CS.loaded = false;
   seen = new Set((await persist.get('seen:' + (S.accId || 'demo'), [])) || []);
@@ -91,13 +96,19 @@ async function loop() {
     status('ok');
   } catch (e) {
     if (my !== gen) return;
-    status('err', e.message || String(e));
+    const msg = e.message || String(e);
+    // 429 — FunPay просит не спешить (часто из-за плагинов/статистики): это не обрыв связи
+    if (/429/.test(msg)) {
+      slow = Math.min(4, slow + 1);
+      status('ok', 'FunPay просит не спешить — проверяю реже');
+    } else status('err', msg);
   } finally {
     if (my === gen) running = false;
   }
   if (my !== gen) return;
   const base = Math.max(2, +S.settings.pollInterval || 3) * 1000;
-  const wait = again ? 50 : CS.status === 'err' ? Math.min(30000, base * 3) : reallyFocused() ? base : base * 1.6;
+  if (CS.status === 'ok' && !CS.error && slow) slow--;
+  const wait = again ? 50 : CS.status === 'err' ? Math.min(30000, base * 3) : (reallyFocused() ? base : base * 1.6) * (1 + slow);
   again = false;
   clearTimeout(timer);
   timer = setTimeout(loop, wait);

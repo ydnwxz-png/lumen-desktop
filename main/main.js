@@ -5,6 +5,7 @@ const store = require('./store');
 const { Session, cleanKey, UA } = require('./fp');
 const updater = require('./updater');
 const automation = require('./automation');
+const discord = require('./discord');
 
 const ROOT = path.join(__dirname, '..');
 const ICON = path.join(ROOT, 'assets', process.platform === 'win32' ? 'icon.ico' : 'icon.png');
@@ -190,6 +191,8 @@ handle('upd:releases', () => {
   if (u) shell.openExternal(u);
   return !!u;
 });
+handle('app:discord', (opts) => discord.set(opts));
+handle('app:discordAvailable', () => discord.available());
 handle('app:info', () => ({ version: app.getVersion(), platform: process.platform, dataDir: store.dir() }));
 handle('app:open', (url) => {
   if (/^https?:\/\//.test(url)) shell.openExternal(url);
@@ -667,6 +670,9 @@ app.whenReady().then(() => {
 });
 app.on('activate', () => gotLock && showMain());
 app.on('before-quit', () => {
+  try {
+    discord.stop();
+  } catch {}
   quitting = true;
   automation.detach();
   store.flush();

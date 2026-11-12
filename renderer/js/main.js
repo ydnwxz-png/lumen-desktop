@@ -4,6 +4,7 @@ import { icon } from './core/icons.js';
 import { S, bus, loadSettings, loadMeta, saveSettings } from './core/state.js';
 import { applyLook } from './ui/look.js';
 import { initTips, menu, err, toast, modal } from './ui/kit.js';
+import { syncDiscord } from './features/discord.js';
 import { palette } from './ui/palette.js';
 import { winControls } from './ui/winctl.js';
 import { closeWebPane } from './ui/webpane.js';
@@ -236,6 +237,7 @@ async function startAccount(id) {
   S.me = me;
   renderMe();
   bus.emit('me');
+  syncDiscord();
   startPoll();
   loadLater();
   syncPluginRail(null);
