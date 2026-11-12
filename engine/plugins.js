@@ -20,7 +20,11 @@ export class Plugins {
     // Вкл/выкл, настройки и данные плагинов — общие для всех аккаунтов (раньше были у каждого аккаунта свои,
     // и при смене аккаунта плагин «выключался»). Переносим старые настройки текущего аккаунта один раз.
     this.shared = new Store(path.join(dir, '.lumen', 'plugins.json'), { plugins: {} });
-    const old = engine.cfg?.plugins || {};
+  }
+
+  // старые настройки плагинов из настроек аккаунта → в общие (только то, чего там ещё нет)
+  migrate() {
+    const old = this.e.cfg?.plugins || {};
     let moved = false;
     for (const [id, c] of Object.entries(old)) {
       if (!this.shared.data.plugins[id]) {
@@ -64,6 +68,7 @@ export class Plugins {
 
   async loadAll() {
     fs.mkdirSync(this.dir, { recursive: true });
+    this.migrate();
     // плагины пишутся как ES-модули (export default); .cjs — для CommonJS
     const pj = path.join(this.dir, 'package.json');
     if (!fs.existsSync(pj)) fs.writeFileSync(pj, '{ "type": "module" }\n');
