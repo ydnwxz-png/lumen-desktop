@@ -1,3 +1,4 @@
+// © 2026 Lumen. Все права защищены. Копирование, изменение и распространение этого кода запрещены без разрешения автора (см. LICENSE).
 import { S } from '../core/state.js';
 
 const mq = matchMedia('(prefers-color-scheme: light)');
@@ -33,6 +34,14 @@ export function applyLook() {
   r.dataset.density = 'comfortable';
   r.dataset.anim = s.animations ? 'on' : 'off';
   r.style.setProperty('--fs', (s.fontSize || 14) + 'px');
+  // подробная настройка: скругления, стекло карточек, свечение, шрифт
+  r.style.setProperty('--rc', Math.min(34, Math.max(6, +s.radius || 26)) + 'px');
+  r.style.setProperty('--ga', (0.012 + (Math.min(100, Math.max(0, s.glass ?? 50)) / 100) * 0.09).toFixed(3));
+  r.style.setProperty('--glow', (Math.min(150, Math.max(0, s.glow ?? 100)) / 100).toFixed(2));
+  const F = { system: "'Segoe UI Variable Text', 'Segoe UI', system-ui, -apple-system, sans-serif", rounded: "'SF Pro Rounded', 'Segoe UI Variable Display', 'Nunito', 'Inter', system-ui, sans-serif", mono: "'Cascadia Code', 'JetBrains Mono', 'SF Mono', Consolas, monospace" };
+  if (F[s.font]) r.style.setProperty('--font', F[s.font] + ", 'Segoe UI Emoji', 'Apple Color Emoji', 'Noto Color Emoji'");
+  else r.style.removeProperty('--font');
+  customBg(s);
 
   // свой акцентный цвет
   const a1 = hex2rgb(s.customAccent?.a1);
@@ -44,6 +53,31 @@ export function applyLook() {
     r.style.setProperty('--a-rgb', avg.map(Math.round).join(', '));
     r.style.setProperty('--on-accent', lum(avg) > 0.62 ? '#111' : '#fff');
   } else ACCENT_VARS.forEach((v) => r.style.removeProperty('--' + v));
+
+  // яркость цвета: приглушить акцент (смешать с серым), если режет глаза
+  const lvl = Math.min(100, Math.max(40, +s.accentLevel || 100)) / 100;
+  if (lvl < 1) {
+    const cs = getComputedStyle(r);
+    const c1 = hex2rgb(cs.getPropertyValue('--a1'));
+    const c2 = hex2rgb(cs.getPropertyValue('--a2')) || c1;
+    if (c1) {
+      const grey = theme === 'light' ? [120, 120, 130] : [70, 70, 78];
+      const m1 = mix(c1, grey, 1 - lvl);
+      const m2 = mix(c2, grey, 1 - lvl);
+      r.style.setProperty('--a1', rgb2hex(m1));
+      r.style.setProperty('--a2', rgb2hex(m2));
+      r.style.setProperty('--a-rgb', mix(m1, m2, 0.5).map(Math.round).join(', '));
+    }
+  }
+
+  // цвет текста (в тёмной теме): белый, тёплый, холодный или свой
+  const tc = theme !== 'light' ? hex2rgb(s.textColor) : null;
+  if (tc) {
+    r.style.setProperty('--text', rgb2hex(tc));
+    const hi = s.contrast !== 'normal';
+    r.style.setProperty('--text-2', `rgba(${tc.join(', ')}, ${hi ? '.8' : '.68'})`);
+    r.style.setProperty('--text-3', `rgba(${tc.join(', ')}, ${hi ? '.62' : '.46'})`);
+  } else ['text', 'text-2', 'text-3'].forEach((v) => r.style.removeProperty('--' + v));
 
   // оттенок фона
   const tint = hex2rgb(s.tint);
@@ -58,4 +92,39 @@ export function applyLook() {
 
   const bg = tint ? rgb2hex(mix(hex2rgb(base.bg), tint, theme === 'light' ? 0.1 : s.bg === 'oled' ? 0.07 : 0.11)) : base.bg;
   window.api?.app.chrome({ bg, fg: theme === 'light' ? '#222233' : '#e8e8ef' }).catch(() => {});
+}
+
+// ---------------------------------------------------------------- свой фон: картинка, GIF или видео
+let bgUrl = null; // blob: для текущего файла
+let bgVer = -1;
+const demoBg = { data: null, type: '' };
+export function setDemoBg(data, type) {
+  demoBg.data = data;
+  demoBg.type = type;
+}
+export function resetBgCache() {
+  bgVer = -1;
+}
+async function customBg(s) {
+  let box = document.querySelector('.custom-bg');
+  if (s.bg !== 'custom') return box?.remove();
+  if (!box) {
+    box = document.createElement('div');
+    box.className = 'custom-bg';
+    document.querySelector('.backdrop')?.after(box);
+  }
+  box.style.setProperty('--dim', ((s.bgDim ?? 45) / 100).toFixed(2));
+  box.style.setProperty('--blur', (s.bgBlur ?? 0) + 'px');
+  const ver = s.bgVer || 0;
+  if (ver === bgVer && box.firstChild) return;
+  bgVer = ver;
+  let f = null;
+  try {
+    f = window.api?.app?.bgGet ? await window.api.app.bgGet() : demoBg.data ? demoBg : null;
+  } catch {}
+  if (bgUrl) URL.revokeObjectURL(bgUrl);
+  bgUrl = null;
+  if (!f?.data) return (box.innerHTML = '');
+  bgUrl = URL.createObjectURL(new Blob([f.data], { type: f.type }));
+  box.innerHTML = f.type.startsWith('video/') ? `<video src="${bgUrl}" autoplay muted loop playsinline></video>` : `<img src="${bgUrl}" alt="">`;
 }

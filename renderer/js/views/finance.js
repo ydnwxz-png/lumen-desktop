@@ -1,3 +1,4 @@
+// © 2026 Lumen. Все права защищены. Копирование, изменение и распространение этого кода запрещены без разрешения автора (см. LICENSE).
 // Финансы: баланс, заморозка, доход по дням, операции.
 import { $, esc, countUp, fmtNum, parseFpDate } from '../core/util.js';
 import { icon } from '../core/icons.js';

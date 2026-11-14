@@ -1,14 +1,16 @@
+// © 2026 Lumen. Все права защищены. Копирование, изменение и распространение этого кода запрещены без разрешения автора (см. LICENSE).
 // Автоматика и плагины в приложении.
-import { $, el, esc, fmtLeft } from '../core/util.js';
+import { $, el, esc, fmtLeft, copyText, plural } from '../core/util.js';
 import { icon } from '../core/icons.js';
 import { S, bus, saveSettings } from '../core/state.js';
 import { seg, switchEl, modal, confirmBox, err, ok, toast, busy } from '../ui/kit.js';
 import { notify } from '../features/notify.js';
+import { syncAuto } from '../features/raise.js';
 
 const VARS = ['$username', '$welcome', '$order_id', '$order_link', '$lot_name', '$price', '$product', '$stars', '$my_name', '$date', '$time'];
 // группы на странице: что относится к общению, что — к заказам
 const GROUPS = [
-  ['orders', 'Заказы и лоты', ['delivery', 'restore', 'blacklist']],
+  ['orders', 'Заказы и лоты', ['delivery', 'raise', 'restore', 'blacklist']],
   ['msg', 'Сообщения покупателям', ['greeting', 'commands', 'reviews', 'thanks', 'remind']],
 ];
 const FEATURES = [
@@ -18,6 +20,7 @@ const FEATURES = [
   ['reviews', 'Ответы на отзывы', 'star', 'Свой ответ на каждую оценку от 1 до 5.', editReviews],
   ['thanks', 'Спасибо за подтверждение', 'checks', 'Сообщение, когда покупатель подтвердил заказ.', (c) => editText(c, 'thanks', 'Спасибо за подтверждение')],
   ['remind', 'Напомнить подтвердить', 'clock', 'Если заказ долго не подтверждён — вежливое напоминание.', editRemind],
+  ['raise', 'Автоподнятие', 'up', 'Поднимаю лоты, как только FunPay разрешает. Работает и в разделе «Лоты».', () => bus.emit('nav', 'lots')],
   ['restore', 'Включать лот после продажи', 'refresh', 'Если FunPay выключил лот после покупки — включаю обратно (для правил автовыдачи).', null],
   ['blacklist', 'Чёрный список', 'shield', 'Этим покупателям не выдаю товар и не отвечаю.', editBlacklist],
 ];
@@ -69,6 +72,8 @@ function setData(d) {
 function onEvent(ev) {
   const d = ev.data || {};
   if (ev.type === 'delivered') toast('📦 Товар выдан', `${d.rule.name} → ${d.order.peer} (#${d.order.id})${d.left != null ? ` · осталось ${d.left}` : ''}`, { kind: 'ok', icon: 'box' });
+  if (ev.type === 'deliveryEmpty') bus.emit('bell-add', { kind: 'stock', title: 'Закончился товар', text: `«${d.rule.name}» — заказ #${d.order.id} выдай вручную`, go: 'auto' });
+  if (ev.type === 'delivered' && d.left != null && d.left <= 2) bus.emit('bell-add', { kind: 'stock', title: 'Мало товара', text: `«${d.rule.name}» — осталось ${d.left} шт. в автовыдаче`, go: 'auto' });
   if (ev.type === 'deliveryEmpty') toast('⚠️ Закончился товар', `«${d.rule.name}» — заказ #${d.order.id} нужно выдать вручную`, { kind: 'err', icon: 'box', ms: 15000 });
   if (ev.type === 'notify') {
     const open = d.url ? () => S.backend?.openBrowser(d.url) : undefined;
@@ -76,6 +81,7 @@ function onEvent(ev) {
     if (S.focused) toast(d.title || d.from || 'Плагин', d.text, { icon: 'layers', ms: 8000, onClick: open });
     else notify({ title: d.title || d.from || 'Плагин', name: d.from || 'Плагин', body: d.text, raw: true, kind: d.kind === 'order' ? 'order' : 'msg', onClick: open });
   }
+  if (ev.type === 'log' && d.level === 'error') bus.emit('bell-add', { kind: 'plug', title: 'Проблема в автоматике', text: d.text, ts: d.t || Date.now(), go: 'auto' });
   if (ev.type === 'log' && data) {
     data.events.push(d);
     if (data.events.length > 60) data.events.shift();
@@ -101,18 +107,35 @@ function render(calm = false) {
   if (calm) p.scrollTop = scroll;
 }
 
+// короткие подписи для строк (полное описание — в подсказке)
+const SHORT = { delivery: 'Оплатил — товар ушёл сам', commands: '!цена, «есть в наличии?»…', greeting: 'Первое сообщение новому покупателю', reviews: 'Свой ответ на 1–5 ★', thanks: 'Когда покупатель закрыл заказ', remind: 'Если долго не подтверждает', restore: 'Если FunPay выключил после продажи', raise: 'Поднимаю лоты сам, когда можно', blacklist: 'Не выдаю и не отвечаю' };
+const upFor = (ms) => { const m = Math.max(0, Math.floor(ms / 60e3)); return m < 60 ? `${m} мин` : `${Math.floor(m / 60)} ч ${m % 60} мин`; };
+
 function draw(p) {
   const m = mode();
+  const ok_ = available();
+  const inf = data?.info || {};
+  const t = inf.today || {};
+  const on = m === 'pc';
+  const state = !ok_ ? ['off', 'В демо не работает', 'Войди в аккаунт FunPay в приложении — и настраивай автовыдачу, автоответы и плагины'] : !on ? ['off', 'Автоматика выключена', 'Нажми кнопку — и Lumen начнёт выдавать товар и отвечать сам'] : inf.status === 'error' ? ['bad', 'Нет связи с FunPay', inf.error || 'Попробую снова сам'] : inf.status === 'ok' ? ['on', 'Автоматика работает', `${inf.startedAt ? upFor(Date.now() - inf.startedAt) + ' · ' : ''}пока Lumen открыт, можно свернуть в трей`] : ['on', 'Запускается…', 'Пара секунд'];
   p.innerHTML = `
-    <div class="page-head"><h1>Автоматика</h1><span class="sub">автовыдача, автоответы, плагины — пока Lumen открыт</span></div>
-    <div class="card auto-mode">
-      <div class="grow"><b>Автоматика</b><div class="dim" style="font-size:12.5px;margin-top:2px">${
-        m === 'pc' ? 'Работает, пока Lumen открыт (можно свернуть в трей).' : 'Выключена. Включи, когда настроишь.'
-      }</div></div>
-      <div class="seg" data-mode><button data-v="pc">${icon('monitor', 14)}Включена</button><button data-v="off">Выключена</button></div>
+    <div class="page-head"><div><div class="dim" style="font-size:13px">выдаёт и отвечает за тебя</div><h1>Автоматика</h1></div><span class="grow"></span>
+      <div class="seg" data-mode><button data-v="pc">Включена</button><button data-v="off">Выключена</button></div></div>
+    <div class="auto-top">
+      <div class="auto-hero ${state[0]}">
+        <button class="pwr" data-pwr ${ok_ ? '' : 'disabled'} data-tip="${on ? 'Выключить' : 'Включить'}">${icon('power', 30)}</button>
+        <h2>${state[1]}</h2><p>${esc(state[2])}</p><span class="grow"></span>
+        <div class="ah-tiles">
+          <div><b>${t.delivered || 0}</b><span>выдано сегодня</span></div>
+          <div><b>${t.commands || 0}</b><span>автоответов</span></div>
+          <div><b>${t.orders || 0}</b><span>заказов сегодня</span></div>
+          <div><b>${inf.plugins || 0}</b><span>плагинов работает</span></div>
+        </div>
+      </div>
+      <div class="auto-cols" data-feats></div>
     </div>
     <div data-body></div>`;
-  seg($('[data-mode]', p), m, async (v) => {
+  const setMode = async (v) => {
     S.settings.automation = { ...(S.settings.automation || {}), mode: v };
     saveSettings();
     try {
@@ -120,57 +143,60 @@ function draw(p) {
     } catch {
       render(true);
     }
-  });
+  };
+  seg($('[data-mode]', p), m, setMode);
+  $('[data-pwr]', p).onclick = () => setMode(on ? 'off' : 'pc');
   const body = $('[data-body]', p);
-  if (!available()) {
-    body.innerHTML = `<div class="empty" style="padding:50px"><div class="orb">${icon('bot', 30)}</div><h3>В демо автоматика не работает</h3><p>Войди в аккаунт FunPay в приложении — и настраивай автовыдачу, автоответы и плагины.</p></div>`;
-    return;
-  }
-  if (!data) {
-    body.innerHTML = `<div class="empty" style="padding:50px"><div class="spinner"></div></div>`;
+  const feats = $('[data-feats]', p);
+  if (!ok_ || !data) {
+    feats.innerHTML = ok_ ? `<div class="empty" style="padding:50px"><div class="spinner"></div></div>` : GROUPS.map(([, title, keys]) => `<div><div class="sec-title">${title}</div>${keys.map((k) => { const f = FEATURES.find((x) => x[0] === k); return `<div class="frow dis"><span class="feat-ic">${icon(f[2], 18)}</span><div class="grow"><b>${f[1]}</b><span>${SHORT[k]}</span></div></div>`; }).join('')}</div>`).join('');
     return;
   }
   const cfg = data.cfg;
-  const inf = data.info || {};
-  const t = inf.today || {};
-  const st = m !== 'pc' ? '' : inf.status === 'ok' ? '<span class="pill ok"><span class="dotc"></span>Работает</span>' : inf.status === 'error' ? `<span class="pill bad" data-tip="${esc(inf.error)}"><span class="dotc"></span>Нет связи</span>` : '<span class="pill warn"><span class="dotc"></span>Запускается</span>';
   body.innerHTML = `
-    <div class="stats stagger" style="grid-template-columns:repeat(4,1fr)">
-      <div class="stat hero"><div class="lbl">${icon('box', 15)}Выдано сегодня</div><div class="val">${t.delivered || 0}</div><div class="hint">${st}</div></div>
-      <div class="stat"><div class="lbl">${icon('bag', 15)}Заказов сегодня</div><div class="val">${t.orders || 0}</div></div>
-      <div class="stat"><div class="lbl">${icon('chat', 15)}Автоответов</div><div class="val">${t.commands || 0}</div></div>
-      <div class="stat"><div class="lbl">${icon('layers', 15)}Плагинов включено</div><div class="val">${inf.plugins || 0}</div></div>
-    </div>
-    <div data-feats></div>
-    <div class="page-head" style="margin:26px 0 12px"><h2 style="margin:0;font-size:19px">Плагины</h2><span class="grow"></span>
+    <div class="page-head" style="margin:26px 0 12px"><h2 style="margin:0;font-size:19px">Плагины</h2><span class="dim" style="font-size:12.5px">свои и чужие .js — у каждого может быть своя страница слева</span><span class="grow"></span>
       <button class="btn sm" data-pfolder>${icon('folder', 15)}Папка</button>
       <button class="btn sm" data-preload>${icon('refresh', 15)}Перезагрузить</button>
       <button class="btn sm pri" data-pinstall>${icon('plus', 15)}Установить</button>
       <input type="file" accept=".js,.mjs,.cjs" hidden data-pfile></div>
     <div class="plug-grid stagger" data-plugins></div>
-    <div class="sec-title">Журнал</div>
+    <div class="page-head" style="margin:26px 0 12px"><h2 style="margin:0;font-size:19px">Журнал</h2><span class="dim" style="font-size:12.5px" data-logcnt></span><span class="grow"></span>
+      <div class="seg" data-logf><button data-v="all">Всё</button><button data-v="bad">Проблемы</button><button data-v="plug">Плагины</button></div>
+      <button class="btn sm" data-logcopy data-tip="Скопировать журнал — удобно отправить разработчику плагина">${icon('copy', 15)}</button></div>
     <div class="card auto-log" data-log></div>`;
-  const feats = $('[data-feats]', body);
-  const grids = {};
-  for (const [g, title] of GROUPS) {
-    feats.append(el(`<div class="sec-title">${title}</div>`));
-    feats.append((grids[g] = el('<div class="feat-grid stagger"></div>')));
-  }
-  for (const [key, name, ic, desc, edit] of FEATURES) {
-    const grid = grids[GROUPS.find((x) => x[2].includes(key))?.[0] || 'msg'];
-    const c = cfg[key];
-    const isOn = key === 'blacklist' ? (c.users || []).length > 0 : !!c.on;
-    const sub = key === 'delivery' ? `${c.rules.length} ${c.rules.length === 1 ? 'правило' : 'правил'}` : key === 'commands' ? `${c.rules.length} шт.` : key === 'blacklist' ? `${(c.users || []).length} чел.` : '';
-    const card = el(`<div class="feat ${isOn ? 'on' : ''}"><div class="row"><span class="feat-ic">${icon(ic, 18)}</span><div class="grow"><b>${name}</b>${sub ? `<span class="dim" style="font-size:12px;margin-left:6px">${sub}</span>` : ''}</div></div><p>${desc}</p><div class="row">${edit ? `<button class="btn sm" data-edit>${icon('settings', 14)}Настроить</button>` : ''}<span class="grow"></span></div></div>`);
-    if (key !== 'blacklist')
-      card.querySelector('.row:last-child').append(
-        switchEl(isOn, (v) => {
-          cfg[key].on = v;
-          save(cfg);
-        })
-      );
-    if (edit) card.querySelector('[data-edit]').onclick = () => edit(cfg);
-    grid.append(card);
+  const counts = Object.fromEntries((data.rules || []).map((r) => [r.id, r.count]));
+  for (const [, title, keys] of GROUPS) {
+    const col = el(`<div><div class="sec-title">${title}</div></div>`);
+    feats.append(col);
+    for (const key of keys) {
+      const [, name, ic, desc, edit] = FEATURES.find((x) => x[0] === key);
+      const c = key === 'raise' ? { on: !!S.settings.autoRaise } : cfg[key];
+      const isOn = key === 'blacklist' ? (c.users || []).length > 0 : !!c.on;
+      let sub = SHORT[key];
+      if (key === 'commands' && c.rules.length) sub = c.rules.slice(0, 2).map((r) => String(r.triggers).split(/[,\n]/)[0].trim()).filter(Boolean).join(' · ') + (c.rules.length > 2 ? ` · ещё ${c.rules.length - 2}` : '');
+      if (key === 'greeting' && c.text) sub = `«${String(c.text).replace(/\s+/g, ' ').slice(0, 34)}…»`;
+      if (key === 'blacklist') sub = (c.users || []).length ? `${c.users.length} ${plural(c.users.length, 'покупатель', 'покупателя', 'покупателей')}` : 'Пусто';
+      if (key === 'remind' && c.hours) sub = `Через ${c.hours} ч после выдачи`;
+      let stock = '';
+      if (key === 'delivery') {
+        const rules = (c.rules || []).filter((r) => r.on !== false);
+        sub = rules.length ? `${rules.length} ${plural(rules.length, 'правило', 'правила', 'правил')} · оплатил — товар ушёл сам` : 'Правил нет — нажми, чтобы добавить';
+        const withN = rules.map((r) => ({ name: r.name, n: counts[r.id] })).filter((r) => r.n != null).slice(0, 4);
+        const mx = Math.max(1, ...withN.map((r) => r.n));
+        stock = withN.length ? `<div class="stock">${withN.map((r) => `<div class="${r.n <= 2 ? 'low' : ''}"><span class="ell">${esc(r.name)}</span><i><u style="width:${Math.max(3, (r.n / mx) * 100)}%"></u></i><b>${r.n} шт${r.n <= 2 ? ' · мало' : ''}</b></div>`).join('')}</div>` : '';
+      }
+      const row = el(`<div class="frow ${isOn ? 'on' : ''} ${edit ? 'click' : ''}" data-tip="${esc(desc)}"><div class="row" style="gap:12px"><span class="feat-ic">${icon(ic, 18)}</span><div class="grow" style="min-width:0"><b>${name}</b><span class="ell">${esc(sub)}</span></div></div>${stock}</div>`);
+      if (key !== 'blacklist')
+        row.querySelector('.row').append(
+          switchEl(isOn, (v) => {
+            if (key === 'raise') return (S.settings.autoRaise = v), saveSettings(), syncAuto();
+            cfg[key].on = v;
+            save(cfg);
+          })
+        );
+      if (edit) row.onclick = (e) => !e.target.closest('.switch') && edit(cfg);
+      col.append(row);
+    }
   }
   renderPlugins();
   renderLog();
@@ -229,12 +255,32 @@ function renderPlugins() {
   }
 }
 
+// Журнал: всё подряд, только проблемы (предупреждения и ошибки) или только плагины
+let logF = 'all';
+const isPlug = (x) => /^\[[^\]]+\]|Плагин/.test(x.text);
+const isBad = (x) => x.level === 'warn' || x.level === 'error';
 function renderLog() {
   const box = $('[data-log]', root);
   if (!box || !data) return;
+  const f = $('[data-logf]', root);
+  if (f && !f.dataset.init) {
+    f.dataset.init = 1;
+    seg(f, logF, (v) => ((logF = v), renderLog()));
+    $('[data-logcopy]', root).onclick = () => {
+      const t = data.events.map((x) => `${new Date(x.t).toLocaleString('ru-RU')} ${x.level || 'info'} ${x.text}`).join('\n');
+      copyText(t || '—').then(() => toast('Журнал скопирован', '', { kind: 'ok', ms: 2000 }));
+    };
+  }
+  const bad = data.events.filter(isBad).length;
+  const cnt = $('[data-logcnt]', root);
+  if (cnt) cnt.innerHTML = bad ? `<span class="pill bad"><span class="dotc"></span>${bad} ${plural(bad, 'проблема', 'проблемы', 'проблем')}</span>` : '';
   const ic = { warn: '⚠️', error: '❌' };
-  const ev = data.events.slice(-30).reverse();
-  box.innerHTML = ev.length ? ev.map((x) => `<div class="log-row"><span class="dim mono">${new Date(x.t).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}</span><span>${ic[x.level] || '•'}</span><span class="grow">${esc(x.text)}</span></div>`).join('') : '<div class="dim" style="padding:14px">Здесь будет видно, что сделала автоматика.</div>';
+  const all = data.events.filter((x) => (logF === 'bad' ? isBad(x) : logF === 'plug' ? isPlug(x) : true));
+  const ev = all.slice(-60).reverse();
+  const when = (t) => { const d = new Date(t); return d.toDateString() === new Date().toDateString() ? d.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }) : d.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' }); };
+  box.innerHTML = ev.length
+    ? ev.map((x) => `<div class="log-row ${x.level === 'error' ? 'bad' : x.level === 'warn' ? 'warn' : ''}"><span class="dim mono">${when(x.t)}</span><span>${ic[x.level] || '•'}</span><span class="grow">${esc(x.text)}</span></div>`).join('')
+    : `<div class="dim" style="padding:14px">${logF === 'bad' ? 'Проблем нет — всё работает ✨' : logF === 'plug' ? 'Плагины пока ничего не писали.' : 'Здесь будет видно, что сделала автоматика.'}</div>`;
 }
 
 // ---------------------------------------------------------------- редакторы

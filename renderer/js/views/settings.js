@@ -1,8 +1,10 @@
+// © 2026 Lumen. Все права защищены. Копирование, изменение и распространение этого кода запрещены без разрешения автора (см. LICENSE).
 // Настройки: вид, ник, уведомления, шаблоны, автоответы, ИИ, аккаунты, система.
 import { $, esc, el, avatar, copyText } from '../core/util.js';
-import { icon } from '../core/icons.js';
+import { icon , logoSvg } from '../core/icons.js';
 import { S, bus, saveSettings, saveTemplates, DEFAULT_SETTINGS } from '../core/state.js';
-import { seg, switchEl, confirmBox, ok, err, toast, busy } from '../ui/kit.js';
+import { seg, switchEl, confirmBox, promptBox, modal, ok, err, toast, busy } from '../ui/kit.js';
+import { themePreview, applyTheme, currentTheme, cleanTheme, myThemes, saveMyTheme, deleteMyTheme, downloadTheme, setBackground } from '../features/themes.js';
 import { NICK_STYLES, nickHtml, myNick } from '../features/nicks.js';
 import { fxHas } from '../features/fx.js';
 import { VARS } from '../features/templates.js';
@@ -10,18 +12,21 @@ import { sound, notify, SOUNDS } from '../features/notify.js';
 import { applyLook } from '../ui/look.js';
 import { dndTick, dndOn, dndOff } from '../features/later.js';
 import { syncDiscord } from '../features/discord.js';
+import { syncClub } from '../features/club.js';
 
 const SECTIONS = [
   ['look', 'Внешний вид', 'palette'],
+  ['ui', 'Интерфейс', 'layers'],
   ['nick', 'Ник Lumen FX', 'sparkles'],
   ['chat', 'Чаты и шаблоны', 'chat'],
   ['notify', 'Уведомления', 'bell'],
   ['ai', 'ИИ-помощник', 'wand'],
   ['acc', 'Аккаунты', 'users'],
+  ['backup', 'Бэкап и перенос', 'archive'],
   ['sys', 'Система', 'monitor'],
   ['about', 'О программе', 'info'],
 ];
-const ACCENTS = { lumen: ['#c6f432', '#5ef0c8'], violet: ['#a78bfa', '#6366f1'], ocean: ['#22d3ee', '#3b82f6'], mint: ['#34d399', '#14b8a6'], sunset: ['#fb923c', '#ec4899'], rose: ['#fb7185', '#e11d48'], gold: ['#fcd34d', '#f59e0b'], lime: ['#bef264', '#22c55e'], mono: ['#f4f4f5', '#71717a'] };
+const ACCENTS = { lumen: ['#c6f432', '#5ef0c8'], helios: ['#f2b8e4', '#b55fa8'], crimson: ['#ff6a4a', '#b8201b'], violet: ['#a78bfa', '#6366f1'], ocean: ['#22d3ee', '#3b82f6'], mint: ['#34d399', '#14b8a6'], sunset: ['#fb923c', '#ec4899'], rose: ['#fb7185', '#e11d48'], gold: ['#fcd34d', '#f59e0b'], lime: ['#bef264', '#22c55e'], mono: ['#f4f4f5', '#71717a'] };
 const TPL_COLORS = { violet: '#a78bfa', ocean: '#38bdf8', mint: '#34d399', sunset: '#fb923c', rose: '#fb7185', gold: '#fbbf24' };
 
 let root,
@@ -72,7 +77,7 @@ function show(sec) {
   page.scrollTop = 0;
   const wrap = el('<div class="stagger"></div>');
   page.append(wrap);
-  ({ look, nick, chat, notify: notif, ai, acc, sys, about })[sec](wrap);
+  ({ look, ui, backup: backupSec, nick, chat, notify: notif, ai, acc, sys, about })[sec](wrap);
 }
 
 function head(w, t, sub) {
@@ -81,9 +86,79 @@ function head(w, t, sub) {
 
 // ---------------------------------------------------------------- разделы
 
+// ---------------------------------------------------------------- Внешний вид
+const PRESETS = [
+  ['Lumen', 'зелёный', { theme: 'dark', accent: 'lumen', tint: '', bg: 'aurora' }],
+  ['Розовая', 'розовый на чёрном', { theme: 'dark', accent: 'helios', tint: '', bg: 'aurora' }],
+  ['Тёмно-красная', 'красный на чёрном', { theme: 'dark', accent: 'crimson', tint: '', bg: 'aurora' }],
+  ['Фиолетовая', 'фиолетовый', { theme: 'dark', accent: 'violet', tint: '', bg: 'aurora' }],
+  ['Океан', 'голубой', { theme: 'dark', accent: 'ocean', tint: '', bg: 'aurora' }],
+  ['Светлая', 'для дня', { theme: 'light', accent: 'lumen', tint: '', bg: 'aurora' }],
+];
+const DETAIL_DEF = { glow: 100, radius: 26, glass: 50, font: 'inter', fontSize: 14, bgDim: 55, bgBlur: 0, accentLevel: 100, textColor: '' };
+
 function look(w) {
-  head(w, 'Внешний вид', 'Тема, цвета и анимации — меняется сразу.');
+  head(w, 'Внешний вид', 'Готовые темы и свои темы. Всё меняется сразу.');
   const st = S.settings;
+  const presetTheme = ([name, , l]) => ({ lumenTheme: 1, name, look: { ...DETAIL_DEF, ...l } });
+  const isCur = (l) => st.accent === l.accent && (st.tint || '') === (l.tint || '') && st.theme === l.theme && st.bg !== 'custom';
+
+  // темы: готовые + мои
+  const themes = el(`<div class="th-grid">${PRESETS.map((p, i) => `<button class="th-card ${isCur(p[2]) ? 'on' : ''}" data-pre="${i}">${themePreview(presetTheme(p))}<b>${p[0]}</b><small>${p[1]}</small></button>`).join('')}</div>`);
+  themes.onclick = async (e) => {
+    const b = e.target.closest('[data-pre]');
+    if (!b) return;
+    await applyTheme(presetTheme(PRESETS[+b.dataset.pre]));
+    show('look');
+  };
+  const mine = el(`<div class="th-grid" data-mine><div class="dim" style="font-size:13px">Загружаю…</div></div>`);
+  const fileIn = el(`<input type="file" accept=".lumen-theme,.json" hidden>`);
+  const actions = el(`<div class="row" style="gap:8px;flex-wrap:wrap">
+    <button class="btn sm pri" data-save>${icon('plus', 14)}Сохранить текущий вид как тему</button>
+    <button class="btn sm" data-load>${icon('down', 14)}Загрузить из файла</button></div>`);
+  actions.append(fileIn);
+  const drawMine = async () => {
+    const l = await myThemes();
+    mine.innerHTML = l.length
+      ? l.map((t, i) => `<div class="th-card" data-my="${i}">${themePreview(t)}<b class="ell">${esc(t.name)}</b><span class="th-acts"><button class="ibtn sm" data-file="${i}" data-tip="Скачать файлом">${icon('down', 14)}</button><button class="ibtn sm" data-del="${i}" data-tip="Удалить">${icon('trash', 14)}</button></span></div>`).join('')
+      : `<div class="dim" style="font-size:13px">Своих тем пока нет. Настрой цвета и фон ниже — и нажми «Сохранить текущий вид как тему».</div>`;
+    mine.onclick = async (e) => {
+      const f = e.target.closest('[data-file]');
+      const d = e.target.closest('[data-del]');
+      const c = e.target.closest('[data-my]');
+      if (f) return downloadTheme(l[+f.dataset.file]);
+      if (d) return (await deleteMyTheme(l[+d.dataset.del].name), drawMine());
+      if (c) (await applyTheme(l[+c.dataset.my]), show('look'));
+    };
+  };
+  drawMine();
+  actions.querySelector('[data-save]').onclick = async () => {
+    const name = await promptBox('Название темы', { value: st.themeName && !PRESETS.some((p) => p[0] === st.themeName) ? st.themeName : '', placeholder: 'Например: Ночной розовый', yes: 'Сохранить' });
+    if (!name?.trim()) return;
+    const t = await currentTheme(name.trim());
+    await saveMyTheme(t);
+    ok('Тема сохранена', t.bgImage || st.bg !== 'custom' ? '' : 'Видео-фон в тему не попадает — только картинка до 3 МБ');
+    drawMine();
+  };
+  actions.querySelector('[data-load]').onclick = () => fileIn.click();
+  fileIn.onchange = async () => {
+    const f = fileIn.files[0];
+    fileIn.value = '';
+    if (!f) return;
+    try {
+      if (f.size > 6 * 1024 * 1024) throw new Error('Файл слишком большой');
+      const t = cleanTheme(JSON.parse(await f.text()));
+      await saveMyTheme(t);
+      await applyTheme(t);
+      ok('Тема поставлена', t.name);
+      show('look');
+    } catch (e) {
+      err('Не получилось', e.message.includes('JSON') ? 'Это не тема Lumen' : e);
+    }
+  };
+
+
+  // цвет
   const cur = st.customAccent || { a1: '#c6f432', a2: '#5ef0c8' };
   const sws = el(`<div class="swatches">${Object.entries(ACCENTS).map(([k, [a, b]]) => `<button class="swatch ${st.accent === k ? 'on' : ''}" data-a="${k}" style="background:linear-gradient(135deg,${a},${b})"></button>`).join('')}<button class="swatch custom ${st.accent === 'custom' ? 'on' : ''}" data-a="custom" data-tip="Свой цвет" style="--c1:${cur.a1};--c2:${cur.a2}">${icon('plus', 14)}</button></div>`);
   const pick = (v) => el(`<input type="color" class="cpick" value="${v}">`);
@@ -93,10 +168,7 @@ function look(w) {
   customRow.querySelector('.row').append(c1, c2);
   customRow.hidden = st.accent !== 'custom';
   const setCustom = () => {
-    set((s) => {
-      s.accent = 'custom';
-      s.customAccent = { a1: c1.value, a2: c2.value };
-    });
+    set((s) => ((s.accent = 'custom'), (s.customAccent = { a1: c1.value, a2: c2.value })));
     const b = sws.querySelector('.custom');
     b.style.setProperty('--c1', c1.value);
     b.style.setProperty('--c2', c2.value);
@@ -110,38 +182,198 @@ function look(w) {
     if (b.dataset.a === 'custom') setCustom();
     else set((s) => (s.accent = b.dataset.a));
   };
+
+  // фон
+  const bgIn = el(`<input type="file" accept="image/png,image/jpeg,image/webp,image/gif,video/mp4,video/webm" hidden>`);
+  const bgSeg = segEl([['aurora', 'Свечение'], ['solid', 'Ровный'], ['oled', 'Чёрный'], ['custom', 'Своя картинка']], st.bg || 'aurora', async (v) => {
+    if (v === 'custom') {
+      const has = window.api?.app?.bgGet ? await window.api.app.bgGet().catch(() => null) : null;
+      if (!has) return bgIn.click();
+    }
+    set((s) => (s.bg = v));
+    show('look');
+  });
+  bgIn.onchange = async () => {
+    const f = bgIn.files[0];
+    bgIn.value = '';
+    if (!f) return show('look');
+    try {
+      await setBackground(new Uint8Array(await f.arrayBuffer()), f.type);
+      set((s) => (s.bg = 'custom'));
+      ok('Фон поставлен', f.type.startsWith('video/') ? 'Видео крутится по кругу без звука' : '');
+    } catch (e) {
+      err('Не получилось', e);
+    }
+    show('look');
+  };
+  const bgBox = el('<div class="row" style="gap:8px;flex-wrap:wrap;justify-content:flex-end"></div>');
+  bgBox.append(bgSeg, bgIn);
+  const range = (k, min, max, step = 1) => {
+    const r = el(`<input type="range" class="range" min="${min}" max="${max}" step="${step}" value="${st[k] ?? DETAIL_DEF[k]}">`);
+    r.oninput = () => set((s) => (s[k] = +r.value));
+    return r;
+  };
+  const custom = st.bg === 'custom';
+  const bgRows = custom
+    ? [
+        row('Картинка или видео', 'PNG, JPG, GIF, WEBP или MP4/WEBM до 60 МБ', (() => {
+          const b = el(`<div class="row" style="gap:8px"><button class="btn sm" data-ch>${icon('image', 14)}Сменить</button><button class="btn sm ghost" data-rm>Убрать</button></div>`);
+          b.querySelector('[data-ch]').onclick = () => bgIn.click();
+          b.querySelector('[data-rm]').onclick = async () => {
+            await window.api?.app?.bgClear?.();
+            set((s) => ((s.bg = 'aurora'), (s.bgVer = Date.now())));
+            show('look');
+          };
+          return b;
+        })()),
+        row('Затемнение', 'Чтобы текст читался поверх картинки', range('bgDim', 0, 90)),
+        row('Размытие', '', range('bgBlur', 0, 30)),
+      ]
+    : [];
+
+  // подробно
+  const fontSeg = segEl([['inter', 'Inter'], ['system', 'Системный'], ['rounded', 'Округлый'], ['mono', 'Моно']], st.font || 'inter', (v) => set((s) => (s.font = v)));
   const tint = pick(st.tint || '#6366f1');
   const tintOff = el(`<button class="btn sm">Без оттенка</button>`);
   const tintBox = el('<div class="row" style="gap:10px"></div>');
   tintBox.append(tintOff, tint);
   tintOff.hidden = !st.tint;
-  tint.oninput = () => {
-    set((s) => (s.tint = tint.value));
-    tintOff.hidden = false;
-  };
-  tintOff.onclick = () => {
-    set((s) => (s.tint = ''));
-    tintOff.hidden = true;
-  };
-  const fs = el(`<input type="range" class="range" min="12" max="16" step="1" value="${st.fontSize}">`);
-  fs.oninput = () => set((s) => (s.fontSize = +fs.value));
-  const reset = el(`<button class="btn sm">${icon('refresh', 14)}Сбросить</button>`);
-  reset.onclick = () => {
-    set((s) => Object.assign(s, { theme: 'dark', accent: 'lumen', bg: 'aurora', tint: '', customAccent: null }));
-    show('look');
+  tint.oninput = () => (set((s) => (s.tint = tint.value)), (tintOff.hidden = false));
+  tintOff.onclick = () => (set((s) => (s.tint = '')), (tintOff.hidden = true));
+  const TXT = [['', 'Белый'], ['#f3ead8', 'Тёплый'], ['#dfe9f5', 'Холодный']];
+  const tcur = st.textColor || '';
+  const tpick = pick(tcur && !TXT.some((x) => x[0] === tcur) ? tcur : '#e8e8ef');
+  const txtBox = el(`<div class="row" style="gap:8px;flex-wrap:wrap;justify-content:flex-end"></div>`);
+  const txtSeg = segEl([...TXT, ['own', 'Свой']], TXT.some((x) => x[0] === tcur) ? tcur : 'own', (v) => (v === 'own' ? tpick.click() : set((s) => (s.textColor = v))));
+  tpick.oninput = () => set((s) => (s.textColor = tpick.value));
+  txtBox.append(txtSeg, tpick);
+  const details = el(`<details class="set-details"><summary><span class="sd-ic">${icon('settings', 16)}</span><span class="grow"><b>Настроить подробно</b><small>Шрифт, цвет текста, яркость, скругления, прозрачность, свечение, оттенок</small></span><span class="sd-btn">Открыть ${icon('chevR', 14)}</span></summary></details>`);
+  details.append(
+    group(
+      row('Шрифт', '', fontSeg),
+      row('Размер текста', '', range('fontSize', 12, 16)),
+      row('Цвет текста', 'Основной цвет надписей', txtBox),
+      row('Яркость цвета', 'Если кнопки и переключатели режут глаза — сделай спокойнее', range('accentLevel', 55, 100)),
+      row('Скругление углов', 'Меньше — строже, больше — мягче', range('radius', 6, 34)),
+      row('Прозрачность карточек', 'Насколько карточки видны поверх фона', range('glass', 0, 100)),
+      row('Яркость свечения', 'Цветной свет по углам окна', range('glow', 0, 150)),
+      row('Оттенок фона', 'Подкрасить тёмные панели в свой цвет', tintBox)
+    )
+  );
+  const reset = el(`<button class="btn sm">${icon('refresh', 14)}Сбросить вид</button>`);
+  reset.onclick = () => (set((s) => Object.assign(s, { theme: 'dark', accent: 'lumen', bg: 'aurora', tint: '', customAccent: null, themeName: '' }, DETAIL_DEF)), show('look'));
+
+  w.append(
+    el(`<div class="sec-title">Готовые темы</div>`),
+    themes,
+    el(`<div class="sec-title">Мои темы</div>`),
+    mine,
+    actions,
+    el(`<div class="sec-title">Цвета и фон</div>`),
+    group(
+      row('Тема', 'Тёмная, светлая или как в Windows', segEl([['dark', 'Тёмная'], ['light', 'Светлая'], ['system', 'Как в системе']], st.theme, (v) => set((s) => (s.theme = v)))),
+      row('Цвет', 'Кнопки, свои сообщения, логотип. «+» — свой цвет', sws),
+      customRow,
+      row('Фон окна', 'Свечение — цветной свет по углам · Ровный — без света · Чёрный — полностью чёрный, для OLED-экранов · Своя картинка — фото, GIF или видео', bgBox),
+      ...bgRows,
+      row('Анимации', 'Плавные переходы, появление сообщений, ники', sw(st.animations, (v) => set((s) => (s.animations = v))))
+    ),
+    details,
+    group(row('Вернуть как было', 'Стандартный тёмный вид с зелёным цветом Lumen', reset))
+  );
+}
+
+/** Галерея тем из бота. */
+// ---------------------------------------------------------------- Интерфейс
+function ui(w) {
+  head(w, 'Интерфейс', 'Размер окна и где стоят кнопки разделов.');
+  const st = S.settings;
+  const zoom = segEl([['auto', 'Авто'], ['0.9', '90%'], ['1', '100%'], ['1.1', '110%'], ['1.25', '125%'], ['1.4', '140%']], String(st.zoom || 'auto'), (v) => set((s) => (s.zoom = v === 'auto' ? 'auto' : +v)));
+  const contrast = segEl([['normal', 'Обычная'], ['high', 'Повышенная']], st.contrast === 'normal' ? 'normal' : 'high', (v) => set((s) => (s.contrast = v)));
+  const nv = st.nav || { pos: 'left', hide: [] };
+  const NAVS = [['chats', 'Чаты'], ['deals', 'Сделки'], ['stats', 'Статистика'], ['finance', 'Финансы'], ['lots', 'Лоты'], ['auto', 'Автоматика'], ['lchat', 'Общий чат']];
+  const hideBox = el(`<div class="nav-hide">${NAVS.map(([k, n]) => `<button class="folder ${(nv.hide || []).includes(k) ? '' : 'on'}" data-k="${k}">${n}</button>`).join('')}</div>`);
+  hideBox.onclick = (e) => {
+    const b = e.target.closest('[data-k]');
+    if (!b) return;
+    const h = new Set(S.settings.nav?.hide || []);
+    h.has(b.dataset.k) ? h.delete(b.dataset.k) : h.add(b.dataset.k);
+    b.classList.toggle('on', !h.has(b.dataset.k));
+    set((s) => (s.nav = { ...(s.nav || {}), hide: [...h] }));
   };
   w.append(
     group(
-      row('Тема', 'Светлая, тёмная или как в системе', segEl([['dark', 'Тёмная'], ['light', 'Светлая'], ['system', 'Системная']], st.theme, (v) => set((s) => (s.theme = v)))),
-      row('Акцентный цвет', 'Кнопки, свои сообщения, подсветка. «+» — свой цвет', sws),
-      customRow,
-      row('Оттенок фона', 'Подкрасить фон и панели в свой цвет', tintBox),
-      row('Фон', 'Аврора — мягкие переливы за окном', segEl([['aurora', 'Аврора'], ['solid', 'Ровный'], ['oled', 'OLED']], st.bg, (v) => set((s) => (s.bg = v)))),
-      row('Размер текста', '', fs),
-      row('Анимации', 'Плавные переходы, появление сообщений, ники', sw(st.animations, (v) => set((s) => (s.animations = v)))),
-      row('Вернуть как было', 'Стандартная тёмная тема с зелёным цветом Lumen', reset)
+      row('Масштаб окна', 'Авто — на большом мониторе (2K, 27") чуть крупнее. Если мелко — поставь 110–125%', zoom),
+      row('Чёткость текста', 'Повышенная — серые подписи светлее и чуть жирнее, лучше видно на ярком мониторе', contrast),
+      row('Кнопки разделов', 'Слева — колонкой, сверху — в верхней полосе, снизу — плавающей панелью', segEl([['left', 'Слева'], ['top', 'Сверху'], ['bottom', 'Снизу']], nv.pos || 'left', (v) => set((s) => (s.nav = { ...(s.nav || {}), pos: v })))),
+      row('Какие разделы показывать', 'Нажми, чтобы скрыть или вернуть. Главная и Настройки — всегда', hideBox)
     )
   );
+}
+
+// ---------------------------------------------------------------- Бэкап и перенос
+const BK_PARTS = [
+  ['look', 'Внешний вид', 'цвета, тема, свой фон, масштаб, панель', true],
+  ['settings', 'Настройки', 'уведомления, чаты, ИИ, система, Discord', true],
+  ['templates', 'Шаблоны', 'быстрые ответы', true],
+  ['chats', 'Метки чатов', 'закрепы, заметки, архив, страницы плагинов', true],
+  ['automation', 'Автоматика', 'автовыдача и товары, автоответы, приветствие', true],
+  ['plugins', 'Плагины', 'файлы плагинов и их настройки', true],
+  ['accounts', 'Аккаунты FunPay', 'golden_key — с ним можно войти в аккаунт!', false],
+];
+function backupSec(w) {
+  head(w, 'Бэкап и перенос', 'Сохрани всё в один файл — и загрузи на новом компьютере или после переустановки.');
+  if (!window.api?.app?.backupMake) {
+    w.append(el(`<div class="empty" style="padding:40px"><p>В демо бэкап недоступен.</p></div>`));
+    return;
+  }
+  const sel = new Set(BK_PARTS.filter((p) => p[3]).map((p) => p[0]));
+  const list = el(`<div class="bk-list">${BK_PARTS.map(([k, n, d, on]) => `<label class="bk-it ${k === 'accounts' ? 'warn' : ''}"><input type="checkbox" data-k="${k}" ${on ? 'checked' : ''}><span><b>${n}</b><small>${d}</small></span></label>`).join('')}</div>`);
+  list.onchange = (e) => {
+    const c = e.target.closest('[data-k]');
+    if (c) c.checked ? sel.add(c.dataset.k) : sel.delete(c.dataset.k);
+  };
+  const go = el(`<button class="btn pri">${icon('down', 15)}Сохранить в файл</button>`);
+  go.onclick = async () => {
+    if (!sel.size) return err('Ничего не выбрано', 'Отметь, что сохранить');
+    if (sel.has('accounts') && !(await confirmBox('Сохранить аккаунты?', 'В файле будет golden_key — с ним любой войдёт в твой аккаунт FunPay. Никому не отправляй этот файл и не публикуй.', { yes: 'Да, сохранить', danger: true }))) return;
+    try {
+      const r = await busy(go, window.api.app.backupMake([...sel]));
+      if (r) ok('Бэкап сохранён', `${r.file} · ${(r.size / 1024 / 1024).toFixed(1)} МБ`);
+    } catch (e) {
+      err('Не сохранилось', e);
+    }
+  };
+  const load = el(`<button class="btn">${icon('up', 15)}Загрузить из файла</button>`);
+  load.onclick = async () => {
+    let r;
+    try {
+      r = await window.api.app.backupOpen();
+    } catch (e) {
+      return err('Не открылось', e);
+    }
+    if (!r) return;
+    const keys = BK_PARTS.filter(([k]) => r.info[k]);
+    const m = modal(`<h3>Что загрузить?</h3><p class="dim" style="margin:4px 0 12px">Бэкап от ${esc(new Date(r.made).toLocaleString('ru-RU'))}${r.app ? ` · Lumen ${esc(r.app)}` : ''}. То, что отметишь, заменит текущее.</p>
+      <div class="bk-list">${keys.map(([k, n]) => `<label class="bk-it"><input type="checkbox" data-k="${k}" checked><span><b>${n}</b><small>${esc(r.info[k])}</small></span></label>`).join('')}</div>
+      ${r.info.plugins ? '<p class="dim" style="font-size:12px;margin-top:10px">Плагины — это код. Загружай их, только если доверяешь этому файлу.</p>' : ''}
+      <div class="modal-acts"><button class="btn" data-close>Отмена</button><button class="btn pri" data-ok>Загрузить</button></div>`);
+    m.el.querySelector('[data-ok]').onclick = async (e) => {
+      const parts = [...m.el.querySelectorAll('[data-k]:checked')].map((x) => x.dataset.k);
+      if (!parts.length) return;
+      try {
+        const res = await busy(e.currentTarget, window.api.app.backupApply(r.token, parts));
+        m.close();
+        toast('Загружено', `${res.done.join(', ')}. Lumen перезапускает окно…`, { kind: 'ok', ms: 2500 });
+        setTimeout(() => location.reload(), 1600);
+      } catch (x) {
+        err('Не загрузилось', x);
+      }
+    };
+  };
+  const acts = el('<div class="row" style="gap:10px;margin-top:14px"></div>');
+  acts.append(go, load);
+  w.append(el(`<div class="sec-title">Что сохранить</div>`), list, acts);
 }
 
 function nick(w) {
@@ -378,13 +610,32 @@ async function acc(w) {
 }
 
 async function sys(w) {
-  head(w, 'Система', 'Запуск, трей, игры и Discord.');
+  head(w, 'Система', 'Запуск, трей, конфиденциальность, игры и Discord.');
   const auto = window.api ? await window.api.app.autostart().catch(() => false) : false;
   w.append(
     group(
       row('Запускать вместе с Windows', 'Сразу в трей, сообщения приходят в фоне', sw(auto, (v) => window.api?.app.autostart(v))),
       row('Крестик сворачивает в трей', 'Чтобы закрыть совсем — правый клик по значку в трее', sw(S.settings.tray, (v) => set((s) => (s.tray = v)))),
       row('Запускать свёрнутым', '', sw(S.settings.startMinimized, (v) => set((s) => (s.startMinimized = v))))
+    )
+  );
+  // конфиденциальность
+  const hd = () => (S.settings.hide ||= { on: false, nick: true, balance: true, buyers: true, orders: true, lots: false });
+  const HID = [['nick', 'Мой ник'], ['balance', 'Баланс и суммы'], ['buyers', 'Покупатели и аватарки'], ['orders', 'Номера заказов'], ['lots', 'Названия лотов']];
+  const hideBox = el(`<div class="nav-hide">${HID.map(([k, n]) => `<button class="folder ${hd()[k] ? 'on' : ''}" data-k="${k}">${n}</button>`).join('')}</div>`);
+  hideBox.onclick = (e) => {
+    const b = e.target.closest('[data-k]');
+    if (!b) return;
+    const v = !hd()[b.dataset.k];
+    b.classList.toggle('on', v);
+    set((s) => (s.hide = { ...hd(), [b.dataset.k]: v }));
+  };
+  w.append(
+    el(`<div class="sec-title">Конфиденциальность</div>`),
+    group(
+      row('Скрыть данные (для стрима и скринов)', 'Размывает выбранное ниже. Быстро — Ctrl+Shift+H или в меню аккаунта', sw(hd().on, (v) => set((s) => (s.hide = { ...hd(), on: v })))),
+      row('Что размывать', 'Нажми, чтобы включить или выключить', hideBox),
+      row('Значок Lumen у моего ника', 'Другие пользователи Lumen увидят, что ты тоже в Lumen. Отправляется только ID профиля FunPay', sw(S.settings.clubShow === true, (v) => (set((s) => (s.clubShow = v)), syncClub(true))))
     )
   );
   // Discord
@@ -422,7 +673,7 @@ async function sys(w) {
 async function about(w) {
   const info = window.api ? await window.api.app.info().catch(() => ({})) : { version: 'демо' };
   w.append(
-    el(`<div class="empty" style="padding:30px 0 10px"><div class="login-logo" style="width:72px;height:72px;border-radius:18px;margin:0 0 6px"><img src="../assets/icon.png" alt=""></div><h3 style="font-size:22px">Lumen <span class="dim" style="font-weight:500;font-size:14px">${esc(info.version || '')}</span></h3><p>Красивый десктопный клиент FunPay. Golden Key и куки лежат только на этом компьютере.</p></div>`),
+    el(`<div class="empty" style="padding:30px 0 10px"><div class="login-logo" style="width:72px;height:72px;border-radius:18px;margin:0 0 6px">${logoSvg(72)}</div><h3 style="font-size:22px">Lumen <span class="dim" style="font-weight:500;font-size:14px">${esc(info.version || '')}</span></h3><p>Красивый десктопный клиент FunPay. Golden Key и куки лежат только на этом компьютере.</p></div>`),
     group(
       ...[
         ['Ctrl K', 'Поиск чатов, заказов и команд'],

@@ -1,3 +1,4 @@
+// © 2026 Lumen. Все права защищены. Копирование, изменение и распространение этого кода запрещены без разрешения автора (см. LICENSE).
 // Демо-режим: выдуманные чаты, заказы и лоты — чтобы посмотреть программу без аккаунта.
 const now = Date.now();
 const MIN = 60e3,
@@ -252,6 +253,10 @@ export function createDemo() {
     },
     async moreReviews() {
       return { reviews: [], next: '' };
+    },
+    async allGames() {
+      await wait(300);
+      return ['Counter-Strike 2', 'Dota 2', 'Telegram', 'Roblox', 'Genshin Impact', 'Brawl Stars', 'Fortnite', 'GTA 5 Online', 'Steam', 'PlayStation', 'ChatGPT', 'Suno', 'Spotify', 'Discord', 'Minecraft', 'Valorant', 'World of Tanks', 'Standoff 2', 'PUBG Mobile', 'Clash Royale'];
     },
     async myLots() {
       await wait(500);

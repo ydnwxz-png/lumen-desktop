@@ -1,3 +1,4 @@
+// © 2026 Lumen. Все права защищены. Копирование, изменение и распространение этого кода запрещены без разрешения автора (см. LICENSE). Частично основано на стороннем коде под лицензией MIT — см. NOTICE.txt.
 // Аккаунт FunPay для Node (главный процесс приложения): сеть — main/fp.js, разбор страниц — linkedom.
 import { createRequire } from 'node:module';
 import { setDOMParser } from '../renderer/js/fp/parse.js';

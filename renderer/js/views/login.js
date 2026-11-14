@@ -1,6 +1,7 @@
+// © 2026 Lumen. Все права защищены. Копирование, изменение и распространение этого кода запрещены без разрешения автора (см. LICENSE).
 // Экран входа: через браузер (с кодом подтверждения) или по golden_key, плюс демо.
 import { $, el, esc } from '../core/util.js';
-import { icon } from '../core/icons.js';
+import { icon , logoSvg } from '../core/icons.js';
 import { busy } from '../ui/kit.js';
 import { winControls } from '../ui/winctl.js';
 
@@ -10,7 +11,7 @@ export function showLogin(onDone, { cancelable = false } = {}) {
   const box = el(`<div id="login">
     <div class="titlebar"></div>
     <div class="login-card">
-      <div class="login-logo"><img src="../assets/icon.png" alt=""></div>
+      <div class="login-logo">${logoSvg(84)}</div>
       <h1>${cancelable ? 'Ещё один <span>аккаунт</span>' : 'Добро пожаловать в <span>Lumen</span>'}</h1>
       <p>Чаты, сделки и лоты FunPay — в одном красивом окне.</p>
       <div class="login-box">

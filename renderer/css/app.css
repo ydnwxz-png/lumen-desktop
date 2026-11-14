@@ -1,3 +1,4 @@
+/* © 2026 Lumen. Все права защищены. Копирование, изменение и распространение этого кода запрещены без разрешения автора (см. LICENSE). */
 @font-face { font-family: 'Inter'; font-weight: 400; src: url('../../assets/fonts/Inter-Regular.woff') format('woff'); font-display: block; }
 @font-face { font-family: 'Inter'; font-weight: 500; src: url('../../assets/fonts/Inter-Medium.woff') format('woff'); font-display: block; }
 @font-face { font-family: 'Inter'; font-weight: 600; src: url('../../assets/fonts/Inter-SemiBold.woff') format('woff'); font-display: block; }
@@ -403,6 +404,7 @@ html[data-idle] *, html[data-idle] *::before, html[data-idle] *::after { animati
 .wn-title svg { color: var(--a2); flex: none; }
 .whatsnew { margin: 6px 0 4px; padding-left: 18px; display: flex; flex-direction: column; gap: 6px; max-height: 52vh; overflow: auto; line-height: 1.45; }
 .whatsnew li.sub { margin-left: 16px; color: var(--text-2); list-style: circle; }
+.whatsnew li.hd { list-style: none; margin: 8px 0 0 -18px; font-weight: 600; color: var(--text); }
 .whatsnew code { font-size: 12px; padding: 1px 5px; border-radius: 5px; background: rgba(var(--a-rgb), .12); }
 .dnd-chip { display: flex; align-items: center; gap: 6px; height: 26px; padding: 0 10px; border-radius: 99px; background: rgba(var(--a-rgb), .14); color: var(--a1); font-size: 12px; font-weight: 600; animation: pop .4s var(--spring); }
 .tpl-bar { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; padding: 2px; }

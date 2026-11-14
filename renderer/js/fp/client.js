@@ -1,3 +1,4 @@
+// © 2026 Lumen. Все права защищены. Копирование, изменение и распространение этого кода запрещены без разрешения автора (см. LICENSE).
 // Клиент FunPay для окна приложения: запросы идут через главный процесс Electron.
 import { createAccount } from './account.js';
 import { openWebPane } from '../ui/webpane.js';

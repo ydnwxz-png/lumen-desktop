@@ -1,3 +1,4 @@
+// © 2026 Lumen. Все права защищены. Копирование, изменение и распространение этого кода запрещены без разрешения автора (см. LICENSE). Частично основано на стороннем коде под лицензией MIT — см. NOTICE.txt.
 // Разбор страниц FunPay (DOMParser).
 import { parseFpDate, stripZW } from '../core/util.js';
 
@@ -380,13 +381,16 @@ export function parseMyLots(html) {
       if (!id) continue;
       const pe = row.querySelector('.tc-price');
       const unit = txt(pe?.querySelector('.unit'));
-      const num = pe?.getAttribute('data-s') || txt(pe).replace(unit, '').trim();
+      const raw = pe?.getAttribute('data-s') || txt(pe).replace(unit, '').trim();
+      const pn = parseFloat(String(raw).replace(/\s/g, '').replace(',', '.'));
+      // FunPay отдаёт цену с кучей знаков (638.01936) — показываем по-человечески: 638.02
+      const num = Number.isFinite(pn) ? String(Math.round(pn * 100) / 100) : raw;
       lots.push({
         id,
         node,
         title: squash(txt(row.querySelector('.tc-desc-text'))) || 'Без названия',
         price: squash(`${num} ${unit}`),
-        priceNum: parseFloat(String(num).replace(/\s/g, '').replace(',', '.')) || 0,
+        priceNum: Number.isFinite(pn) ? Math.round(pn * 100) / 100 : 0,
         unit: unit || '₽',
         amount: squash(txt(row.querySelector('.tc-amount'))),
         server: [txt(row.querySelector('.tc-server')), txt(row.querySelector('.tc-side'))].filter(Boolean).join(', '),
@@ -631,4 +635,15 @@ export function waitMs(msg) {
   if (/минут|хвилин|minute/.test(l)) return Math.max(1, (n || 2) - 1) * 60e3;
   if (/час|годин|hour/.test(l)) return Math.max(60e3, ((n || 1) - 0.5) * 3600e3);
   return 10e3;
+}
+
+/** Все игры с главной FunPay: ['Counter-Strike 2', 'Telegram', ...] */
+export function parseAllGames(html) {
+  const d = doc(html);
+  const out = new Set();
+  for (const t of d.querySelectorAll('.promo-game-item .game-title, .promo-games .game-title, .game-title')) {
+    const n = squash(txt(t.querySelector('a') || t));
+    if (n && n.length < 60) out.add(n);
+  }
+  return [...out];
 }

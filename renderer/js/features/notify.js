@@ -1,5 +1,6 @@
+// © 2026 Lumen. Все права защищены. Копирование, изменение и распространение этого кода запрещены без разрешения автора (см. LICENSE).
 // Звук, всплывашки (свои / системные / внутри окна) и счётчик на иконке.
-import { S } from '../core/state.js';
+import { S, bus } from '../core/state.js';
 import { toast } from '../ui/kit.js';
 import { avatar, esc } from '../core/util.js';
 import { icon } from '../core/icons.js';
@@ -58,6 +59,9 @@ const themeColors = () => {
 /** p: {title, body, avatar, node, kind:'msg'|'order'} */
 export function notify(p) {
   const n = S.settings.notify;
+  // заказы и отзывы попадают и в колокольчик
+  if (!p.test && (p.kind === 'order' || /отзыв/i.test(`${p.title} ${p.body}`)))
+    bus.emit('bell-add', { kind: p.kind === 'order' ? 'order' : 'review', title: p.title, text: p.body, node: p.node });
   const log = (r) => !p.test && nlog(p.name || p.title, p.body, r);
   if (n.mode === 'off') return log('пропущено: уведомления выключены');
   const body = n.preview || p.raw ? p.body : 'Новое сообщение';

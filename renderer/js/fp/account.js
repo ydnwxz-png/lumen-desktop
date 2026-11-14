@@ -1,3 +1,4 @@
+// © 2026 Lumen. Все права защищены. Копирование, изменение и распространение этого кода запрещены без разрешения автора (см. LICENSE). Частично основано на стороннем коде под лицензией MIT — см. NOTICE.txt.
 // Аккаунт FunPay: все действия и разбор страниц. Один и тот же код работает
 // в окне приложения и в движке автоматики (главный процесс, транспорт — main/fp.js).
 //
@@ -153,6 +154,11 @@ export function createAccount(transport, { accId = '' } = {}) {
       return { reviews: P.parseReviews(d), next: P.parseContinue(d) };
     },
 
+    async allGames() {
+      const r = await get('/');
+      if (r.status >= 400) throw new Error(`FunPay не открылся (HTTP ${r.status})`);
+      return P.parseAllGames(r.text);
+    },
     async myLots() {
       const r = await get(`/users/${me.userId}/`);
       if (r.status >= 400) throw new Error(`Профиль не открылся (HTTP ${r.status})`);

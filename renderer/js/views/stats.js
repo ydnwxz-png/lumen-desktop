@@ -1,9 +1,10 @@
+// © 2026 Lumen. Все права защищены. Копирование, изменение и распространение этого кода запрещены без разрешения автора (см. LICENSE).
 // Подробная статистика продаж: показатели со сравнением с прошлым периодом, выручка по дням,
 // календарь заказов, часы и дни недели, разделы, товары, покупатели.
 // Всё считается из списка продаж FunPay (Сделки → Продажи). Графики — простой SVG, один цвет (акцент).
 import { $, esc, fmtNum, parseFpDate, plural } from '../core/util.js';
 import { icon } from '../core/icons.js';
-import { S } from '../core/state.js';
+import { S, bus } from '../core/state.js';
 import { modal, seg } from '../ui/kit.js';
 import { openProfile } from './profile.js';
 
@@ -19,6 +20,19 @@ const WD = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
 const MON = ['янв', 'фев', 'мар', 'апр', 'мая', 'июн', 'июл', 'авг', 'сен', 'окт', 'ноя', 'дек'];
 
 let cache = null; // { acc, at, cutoff, items }
+
+/** Продажи с даты cutoff (0 — все). Общий кэш на 5 минут — им пользуются и Главная, и Статистика. */
+export async function loadSales(cutoff, { force = false, pages = 60, progress } = {}) {
+  const c0 = cache;
+  if (!force && c0 && c0.acc === S.accId && Date.now() - c0.at < 5 * 60e3 && !c0.items.partial && c0.cutoff <= cutoff) return c0.items;
+  const be = S.backend;
+  const items = await be.salesSince(cutoff, pages, progress);
+  if (be === S.backend) cache = { acc: S.accId, at: Date.now(), cutoff, items };
+  return items;
+}
+/** Продажи с временем (ts), без нераспознанных дат. */
+export const withTs = (raw) => raw.map((t) => { const d = parseFpDate(t.date); return d ? { ...t, ts: d.getTime(), hasTime: /\d:\d\d/.test(t.date) } : null; }).filter(Boolean);
+export { mainCur, calc, startOfDay, range };
 
 const startOfDay = (t) => {
   const d = new Date(t);
@@ -225,10 +239,22 @@ const CSS = `<style>
 .st-hr-s{font-size:11.5px;color:var(--text-3)}
 .st-tip{position:fixed;z-index:200;pointer-events:none;padding:7px 10px;border-radius:10px;background:var(--surface);border:1px solid var(--line-2);box-shadow:var(--shadow-lg);font-size:12.5px;max-width:320px;opacity:0;transition:opacity .1s}
 .st-foot{font-size:12px;color:var(--text-3);margin-top:12px}
+.st-tbl{display:flex;flex-direction:column}
+.st-tr{display:grid;grid-template-columns:minmax(0,1fr) 80px 120px 90px;gap:10px;padding:9px 6px;border-top:1px solid var(--line);font-size:13px;align-items:center}
+.st-tr.h{border-top:0;color:var(--text-3);font-size:12px}
+.st-tr[data-buyer]{cursor:pointer;border-radius:10px}
+.st-tr[data-buyer]:hover{background:var(--hover)}
+.st-k .v{font-weight:400;font-size:24px;letter-spacing:-.03em}
+.st-k{border-radius:18px;background:linear-gradient(180deg,rgba(255,255,255,.05),rgba(255,255,255,.015));border-color:rgba(255,255,255,.07)}
+.st-card{border-radius:20px}
 @media (max-width:900px){.st-kpis{grid-template-columns:repeat(2,1fr)}.st-two{grid-template-columns:1fr}}
 </style>`;
 
+/** Статистика теперь отдельный раздел слева. */
 export function openStats() {
+  bus.emit('nav', 'stats');
+}
+function _oldStats() {
   const m = modal(`${CSS}<div class="st-wrap"><div class="row" style="margin-bottom:16px;gap:10px"><h3 class="grow" style="margin:0">Статистика продаж</h3><div class="seg" data-p>${PERIODS.map(([v, n]) => `<button data-v="${v}">${n}</button>`).join('')}</div><button class="ibtn" data-reload data-tip="Загрузить заново">${icon('refresh', 17)}</button><button class="ibtn" data-close>${icon('x', 18)}</button></div><div data-body></div></div><div class="st-tip"></div>`, { wide: true });
   m.el.style.width = 'min(1080px, 100%)';
   const body = $('[data-body]', m.el);
@@ -249,6 +275,8 @@ export function openStats() {
   });
   let gen = 0;
   let period = '30';
+  let tab = 'all';
+  let metric = 'sum';
   const run = async (days, force) => {
     period = days;
     const my = ++gen;
@@ -256,11 +284,8 @@ export function openStats() {
     const need = R.prevFrom ?? 0; // грузим и прошлый период — для сравнения
     body.innerHTML = `<div class="empty" style="padding:60px"><div class="spinner"></div><p data-note>Загружаю продажи…</p></div>`;
     try {
-      const c0 = cache;
-      const fresh = !force && c0 && c0.acc === S.accId && Date.now() - c0.at < 5 * 60e3 && !c0.items.partial && c0.cutoff <= need;
-      const raw = fresh ? c0.items : await S.backend.salesSince(need, days === '0' ? 80 : 60, (n) => my === gen && $('[data-note]', body) && ($('[data-note]', body).textContent = `Загружено продаж: ${n}`));
+      const raw = await loadSales(need, { force, pages: days === '0' ? 80 : 60, progress: (n) => my === gen && $('[data-note]', body) && ($('[data-note]', body).textContent = `Загружено продаж: ${n}`) });
       if (my !== gen) return;
-      if (!fresh) cache = { acc: S.accId, at: Date.now(), cutoff: need, items: raw };
       render(raw, R, days);
     } catch (e) {
       if (my === gen) body.innerHTML = `<div class="empty" style="padding:50px"><div class="orb" style="color:var(--bad)">${icon('alert', 28)}</div><h3>Не загрузилось</h3><p>${esc(e.message)}</p></div>`;
@@ -325,7 +350,69 @@ export function openStats() {
     const buyers = [...st.buyers.values()].sort((a, b) => b.sum - a.sum || b.n - a.n).slice(0, 8);
     const hasHours = st.byHour.some(Boolean);
 
-    body.innerHTML = `
+    // по дням: заказы, выручка, покупатели, товары — для графика и календаря
+    const dayInfo = new Map();
+    for (const t of st.list) {
+      if (t.state === 'refunded') continue;
+      const dk = startOfDay(t.ts);
+      const x = dayInfo.get(dk) || { n: 0, sum: 0, buyers: new Set(), goods: new Map() };
+      x.n++;
+      x.sum += (t.currency || '₽') === cur ? t.amount || 0 : 0;
+      if (t.peer) x.buyers.add(t.peer);
+      if (t.desc) x.goods.set(t.desc, (x.goods.get(t.desc) || 0) + 1);
+      dayInfo.set(dk, x);
+    }
+    const METRICS = { sum: ['Выручка', (x) => x.sum, (v) => money(v, cur)], n: ['Заказы', (x) => x.n, (v) => `${v} ${plural(v, 'заказ', 'заказа', 'заказов')}`], b: ['Покупатели', (x) => x.buyers.size, (v) => `${v} ${plural(v, 'покупатель', 'покупателя', 'покупателей')}`], avg: ['Средний чек', (x) => (x.n ? x.sum / x.n : 0), (v) => money(v, cur)] };
+    const bucketInfo = (t0, t1) => {
+      const r = { n: 0, sum: 0, buyers: new Set() };
+      for (const [dk, x] of dayInfo) if (dk >= t0 && dk < t1) (r.n += x.n), (r.sum += x.sum), x.buyers.forEach((b) => r.buyers.add(b));
+      return r;
+    };
+    const nextKey = (t) => { const d = new Date(t); return bucket === 'month' ? new Date(d.getFullYear(), d.getMonth() + 1, 1).getTime() : new Date(d.getFullYear(), d.getMonth(), d.getDate() + (bucket === 'week' ? 7 : 1)).getTime(); };
+    const chartFor = (mk) => {
+      const [nm, fn, fmt] = METRICS[mk];
+      const data = bl.map(([t]) => { const x = bucketInfo(t, nextKey(t)); const v = fn(x); return { label: lab(t), value: v, tip: `${bucket === 'week' ? 'Неделя с ' : ''}${lab(t)}: ${fmt(Math.round(v))}${mk !== 'n' ? ` · ${x.n} ${plural(x.n, 'заказ', 'заказа', 'заказов')}` : ''}` }; });
+      const hi = data.reduce((bi, d, i, a) => (d.value > a[bi].value ? i : bi), 0);
+      return `<div class="sub">${nm} ${bucket === 'day' ? 'по дням' : bucket === 'week' ? 'по неделям' : 'по месяцам'}. Наведи на столбик — подробности. Ярче — лучший ${bucket === 'day' ? 'день' : bucket === 'week' ? 'неделя' : 'месяц'}</div>${columns(data, { labelsEvery: Math.ceil(data.length / 10), highlight: hi })}`;
+    };
+
+    // календарь: обычный месяц, листается стрелками; в клетке — выбранный показатель
+    const lastTs = Math.max(...st.list.map((t) => t.ts));
+    let calM = new Date(new Date(Math.min(Date.now(), lastTs)).getFullYear(), new Date(Math.min(Date.now(), lastTs)).getMonth(), 1);
+    const minM = new Date(new Date(firstTs).getFullYear(), new Date(firstTs).getMonth(), 1).getTime();
+    const MONF = ['январь', 'февраль', 'март', 'апрель', 'май', 'июнь', 'июль', 'август', 'сентябрь', 'октябрь', 'ноябрь', 'декабрь'];
+    const monthCal = (mk) => {
+      const [, fn, fmt] = METRICS[mk];
+      const y = calM.getFullYear();
+      const m = calM.getMonth();
+      const first = new Date(y, m, 1);
+      const lead = (first.getDay() + 6) % 7;
+      const dim = new Date(y, m + 1, 0).getDate();
+      const today = startOfDay(Date.now());
+      let mx = 1;
+      for (let d = 1; d <= dim; d++) { const x = dayInfo.get(new Date(y, m, d).getTime()); if (x) mx = Math.max(mx, fn(x)); }
+      let h = WD.map((w) => `<div class="wd">${w}</div>`).join('') + '<div></div>'.repeat(lead);
+      let tot = { n: 0, sum: 0 };
+      for (let d = 1; d <= dim; d++) {
+        const t = new Date(y, m, d).getTime();
+        const x = dayInfo.get(t);
+        const v = x ? fn(x) : 0;
+        if (x) (tot.n += x.n), (tot.sum += x.sum);
+        const lv = v ? 0.1 + 0.55 * (v / mx) : 0;
+        const top = x ? [...x.goods].sort((a, b) => b[1] - a[1])[0] : null;
+        const tip = x ? `${d} ${MON[m]}, ${WD[(new Date(t).getDay() + 6) % 7].toLowerCase()} — ${x.n} ${plural(x.n, 'заказ', 'заказа', 'заказов')} · ${money(x.sum, cur)} · ${x.buyers.size} ${plural(x.buyers.size, 'покупатель', 'покупателя', 'покупателей')}${top ? ` · чаще всего: ${cut(top[0], 50)}` : ''}` : `${d} ${MON[m]} — заказов нет`;
+        h += `<div class="d ${t > today ? 'fut' : ''} ${t === today ? 'today' : ''}" style="${v ? `background:rgba(var(--a-rgb),${lv.toFixed(2)});border-color:rgba(var(--a-rgb),${(lv + 0.1).toFixed(2)})` : ''}" data-st="${esc(tip)}"><span class="n">${d}</span>${v ? `<span class="c">${esc(mk === 'n' || mk === 'b' ? String(Math.round(v)) : compact(v))}</span>` : ''}</div>`;
+      }
+      return { html: h, tot };
+    };
+
+    const allGoods = [...st.goods.values()].sort((a, b) => b.sum - a.sum || b.n - a.n);
+    const allCats = [...st.cats.values()].sort((a, b) => b.sum - a.sum);
+    const allBuyers = [...st.buyers.values()].sort((a, b) => b.sum - a.sum || b.n - a.n);
+    const foot = `<div class="st-foot">Посчитано по ${st.list.length} ${plural(st.list.length, 'продаже', 'продажам', 'продажам')} за период${st.otherCur ? ` · ${st.otherCur} в другой валюте — в суммы не вошли` : ''}${raw.partial ? ' · FunPay попросил подождать, поэтому загружены не все — нажми ↻ через минуту' : ''}</div>`;
+
+    const TABS = {
+      all: () => `
       <div class="st-kpis">
         ${k('Выручка', money(st.revenue, cur), `${st.orders} ${plural(st.orders, 'заказ', 'заказа', 'заказов')}`, pv && delta(st.revenue, pv.revenue), true)}
         ${k('Заработано', money(st.earned, cur), 'подтверждённые заказы', pv && delta(st.earned, pv.earned))}
@@ -337,24 +424,45 @@ export function openStats() {
         ${k('Самая дорогая продажа', st.max ? money(st.max.amount, cur) : '—', st.max ? esc(cut(st.max.desc, 40)) : '')}
       </div>
       ${vs && pv ? `<div class="st-foot" style="margin:-4px 0 4px">▲▼ — ${vs}</div>` : ''}
-      ${
-        bl.length > 1
-          ? `<div class="st-card"><h4>Выручка ${bucket === 'day' ? 'по дням' : bucket === 'week' ? 'по неделям' : 'по месяцам'}</h4><div class="sub">Наведи на столбик — сумма и заказы. Светлее — лучший ${bucket === 'day' ? 'день' : bucket === 'week' ? 'неделя' : 'месяц'}</div>
-        ${columns(revData, { labelsEvery: Math.ceil(revData.length / 10), highlight: bestI })}</div>`
-          : ''
-      }
-      ${spanDays >= 14 ? `<div class="st-card"><h4>Календарь заказов</h4><div class="sub">Сколько заказов было в каждый день — видно, когда покупают чаще</div>${calendar(st, from, R.to)}</div>` : ''}
+      <div class="st-card"><div class="row" style="gap:10px;margin-bottom:4px"><h4 class="grow">График</h4><div class="seg" data-metric>${Object.entries(METRICS).map(([v, [n]]) => `<button data-v="${v}">${n}</button>`).join('')}</div></div><div data-chart>${bl.length > 1 ? chartFor(metric) : '<div class="sub">Для графика нужен период длиннее одного дня</div>'}</div></div>
+      <div class="st-card"><div class="row" style="gap:10px;margin-bottom:10px"><h4>Календарь</h4><span class="dim" style="font-size:12px" data-caltot></span><div class="mcal-nav"><button class="ibtn" data-cal="-1">${icon('chevL', 18)}</button><b data-calm></b><button class="ibtn" data-cal="1">${icon('chevR', 18)}</button></div></div><div class="mcal" data-mcal></div><div class="sub" style="margin:10px 0 0">В клетке — ${'выбранный выше показатель'}. Наведи на день — заказы, выручка, покупатели и что покупали</div></div>
       <div class="st-two">
         ${hasHours ? `<div class="st-card"><h4>Время покупок</h4><div class="sub">Чаще всего — с ${hourMax}:00 до ${hourMax + 1}:00. Будь на связи и поднимай лоты в это время</div>${columns(hours, { h: 150, labelsEvery: 3, highlight: hourMax })}</div>` : ''}
         <div class="st-card"><h4>Дни недели</h4><div class="sub">Больше всего заказов — ${['в понедельник', 'во вторник', 'в среду', 'в четверг', 'в пятницу', 'в субботу', 'в воскресенье'][wdMax]}</div>${columns(wds, { h: 150, highlight: wdMax })}</div>
       </div>
-      <div class="st-card"><h4>Товары</h4><div class="sub">Самые прибыльные лоты. Наведи — полное название</div>${hbars(goods, cur, st.revenue, { lines: 2 })}</div>
       <div class="st-two">
-        <div class="st-card"><h4>Разделы</h4><div class="sub">Где больше всего зарабатываешь</div>${hbars(cats, cur, st.revenue)}</div>
-        <div class="st-card"><h4>Покупатели</h4><div class="sub">Кто принёс больше всего. Нажми — профиль</div>${hbars(buyers, cur, st.revenue, { click: 'data-buyer' })}</div>
-      </div>
-      <div class="st-foot">Посчитано по ${st.list.length} ${plural(st.list.length, 'продаже', 'продажам', 'продажам')} за период${st.otherCur ? ` · ${st.otherCur} в другой валюте — в суммы не вошли` : ''}${raw.partial ? ' · FunPay попросил подождать, поэтому загружены не все — нажми ↻ через минуту' : ''}</div>`;
-    // покупатели без id профиля — не кликаются
-    body.querySelectorAll('[data-buyer=""]').forEach((x) => x.removeAttribute('data-buyer'));
+        <div class="st-card"><h4>Топ товаров</h4><div class="sub">Самые прибыльные лоты · все — во вкладке «Товары»</div>${hbars(goods.slice(0, 5), cur, st.revenue, { lines: 2 })}</div>
+        <div class="st-card"><h4>Топ разделов</h4><div class="sub">Где больше всего зарабатываешь</div>${hbars(cats.slice(0, 5), cur, st.revenue)}</div>
+      </div>${foot}`,
+      goods: () => `<div class="st-card" style="margin-top:0"><h4>Товары · ${allGoods.length}</h4><div class="sub">Все лоты, которые покупали за период — по выручке. Наведи — полное название и доля</div>${hbars(allGoods.slice(0, 60), cur, st.revenue, { lines: 2 })}</div>${foot}`,
+      cats: () => `<div class="st-card" style="margin-top:0"><h4>Разделы · ${allCats.length}</h4><div class="sub">Игры и категории FunPay — где больше всего заказов и денег</div>${hbars(allCats, cur, st.revenue)}</div>${foot}`,
+      buyers: () => `<div class="st-kpis" style="grid-template-columns:repeat(3,1fr)">${k('Покупателей', String(st.buyers.size), '', pv && delta(st.buyers.size, pv.buyers.size), true)}${k('Вернулись снова', String(st.repeat), st.buyers.size ? `${Math.round((st.repeat / st.buyers.size) * 100)}% покупателей` : '')}${k('В среднем на покупателя', money(st.buyers.size ? st.revenue / st.buyers.size : 0, cur), '')}</div>
+        <div class="st-card"><h4>Покупатели</h4><div class="sub">Кто принёс больше всего. Нажми — профиль</div>
+        <div class="st-tbl"><div class="st-tr h"><span>Покупатель</span><span>Заказов</span><span>Сумма</span><span>Последний</span></div>
+        ${allBuyers.slice(0, 80).map((b) => `<div class="st-tr" ${b.id ? `data-buyer="${esc(b.id)}"` : ''}><span class="ell"><b>${esc(b.name)}</b>${b.n >= 2 ? ' <span class="pill ok" style="height:20px;font-size:11px">постоянный</span>' : ''}</span><span>${b.n}</span><span>${money(b.sum, cur)}</span><span class="dim">${dshort(b.last)}</span></div>`).join('')}</div></div>${foot}`,
+    };
+    body.innerHTML = `<div class="seg" data-tab style="margin-bottom:14px"><button data-v="all">Обзор</button><button data-v="goods">Товары</button><button data-v="cats">Разделы</button><button data-v="buyers">Покупатели</button></div><div data-tb></div>`;
+    const tb = $('[data-tb]', body);
+    const drawCal = () => {
+      const c = $('[data-mcal]', tb);
+      if (!c) return;
+      const r = monthCal(metric);
+      c.innerHTML = r.html;
+      $('[data-calm]', tb).textContent = `${MONF[calM.getMonth()]} ${calM.getFullYear()}`;
+      $('[data-caltot]', tb).textContent = r.tot.n ? `· ${r.tot.n} ${plural(r.tot.n, 'заказ', 'заказа', 'заказов')} на ${money(r.tot.sum, cur)}` : '· заказов нет';
+      $('[data-cal="-1"]', tb).disabled = calM.getTime() <= minM;
+      $('[data-cal="1"]', tb).disabled = calM.getTime() >= new Date(new Date().getFullYear(), new Date().getMonth(), 1).getTime();
+    };
+    const showTab = (v) => {
+      tab = v;
+      tb.innerHTML = TABS[v]();
+      tb.querySelectorAll('[data-buyer=""]').forEach((x) => x.removeAttribute('data-buyer'));
+      const ms = $('[data-metric]', tb);
+      if (ms) seg(ms, metric, (mv) => { metric = mv; if (bl.length > 1) $('[data-chart]', tb).innerHTML = chartFor(mv); drawCal(); });
+      tb.querySelectorAll('[data-cal]').forEach((b) => (b.onclick = () => { calM = new Date(calM.getFullYear(), calM.getMonth() + +b.dataset.cal, 1); drawCal(); }));
+      drawCal();
+    };
+    seg($('[data-tab]', body), tab, showTab);
+    showTab(tab);
   }
 }

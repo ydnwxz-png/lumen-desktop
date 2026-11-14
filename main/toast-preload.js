@@ -1,3 +1,4 @@
+// © 2026 Lumen. Все права защищены. Копирование, изменение и распространение этого кода запрещены без разрешения автора (см. LICENSE).
 const { contextBridge, ipcRenderer } = require('electron');
 contextBridge.exposeInMainWorld('toastApi', {
   onToast: (fn) => ipcRenderer.on('toast', (_e, p) => fn(p)),

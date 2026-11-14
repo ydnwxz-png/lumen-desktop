@@ -1,3 +1,4 @@
+// © 2026 Lumen. Все права защищены. Копирование, изменение и распространение этого кода запрещены без разрешения автора (см. LICENSE).
 // Экран чатов: список с папками и поиском, переписка, отправка, шаблоны, картинки.
 import { $, $$, el, esc, avatar, richText, debounce, flip, hhmm, dayLabel, dayKey, stripZW, findOrderIds, copyText } from '../core/util.js';
 import { icon } from '../core/icons.js';
@@ -8,12 +9,13 @@ import { peerNick, NICK_STYLES, TAG_COLORS } from '../features/nicks.js';
 import { menu, menuAt, err, ok, lightbox, toast, promptBox, modal } from '../ui/kit.js';
 import { openOrder } from './order.js';
 import { openProfile } from './profile.js';
+import { renderBuyer } from '../features/buyer.js';
 import { L, addLater, cancelLater, sendLaterNow, whenText, presets } from '../features/later.js';
 
 const FOLDERS = [
   ['all', 'Все', 'chat'],
   ['unread', 'Новые', 'inbox'],
-  ['pinned', 'Закреплённые', 'pin'],
+  ['pinned', 'Закреп', 'pin'],
   ['archive', 'Архив', 'archive'],
 ];
 
@@ -32,7 +34,9 @@ export function mountChats(container) {
     </div>
     <div class="clist-items"></div>
   </section>
-  <section class="chat"></section>`;
+  <section class="chat"></section>
+  <aside class="cinfo"></aside>`;
+  sideEl = $('.cinfo', root);
   listEl = $('.clist-items', root);
   chatEl = $('.chat', root);
   $('#chat-q', root).addEventListener(
@@ -271,7 +275,18 @@ async function noteEdit(node, name) {
 
 // ---------------------------------------------------------------- чат
 
+let sideEl;
+/** Панель покупателя справа — перерисовываем, только когда сменился чат, лот или заказ. */
+function renderSide() {
+  if (!sideEl) return;
+  const k = V.page ? `${V.open}|${V.page.lotName || ''}|${lastOrderId()}` : '';
+  if (sideEl.dataset.k === k && sideEl.childElementCount) return;
+  sideEl.dataset.k = k;
+  renderBuyer(sideEl, V.page, lastOrderId());
+}
+
 function renderEmpty() {
+  renderSide();
   chatEl.innerHTML = `<div class="empty"><div class="orb">${icon('chat', 34)}</div><h3>Выбери чат</h3><p>Сообщения приходят сами. <span class="kbd" style="margin:0">Ctrl K</span> — быстрый поиск чата, заказа или действия.</p></div>`;
 }
 
@@ -405,37 +420,51 @@ function renderHead() {
     }
   };
   renderLot();
+  renderSide();
 }
 
 /** Полоска под шапкой: какой лот смотрит покупатель — полное название. */
 function renderLot() {
   const p = V.page;
   const bar = $('.lot-bar', chatEl);
-  if (!bar) return;
-  if (!p?.lotName) {
+  if (!bar || !p) return;
+  // запоминаем последний лот, который смотрел покупатель: если он уйдёт со страницы — останется видно
+  const mt = meta(V.open);
+  if (p.lotName && (mt.lastLot?.n !== p.lotName || mt.lastLot?.u !== (p.lotUrl || ''))) setMeta(V.open, { lastLot: { n: p.lotName, u: p.lotUrl || '', t: Date.now() } });
+  const lot = p.lotName ? { n: p.lotName, u: p.lotUrl || '', now: true } : mt.lastLot ? { ...mt.lastLot, now: false } : null;
+  if (!lot) {
     bar.hidden = true;
     bar.dataset.k = '';
     return;
   }
-  if (bar.dataset.k === p.lotName && !bar.hidden) return;
-  bar.dataset.k = p.lotName;
+  const key = `${lot.now}|${lot.n}|${lot.u}`;
+  if (bar.dataset.k === key && !bar.hidden) return;
+  bar.dataset.k = key;
   bar.hidden = false;
+  bar.classList.toggle('past', !lot.now);
   bar.classList.remove('open');
+  const ago = lot.t ? whenText(lot.t) : '';
   bar.innerHTML = `
-    <span class="lb-ic">${icon('box', 16)}</span>
+    <span class="lb-ic">${icon(lot.now ? 'eye' : 'clock', 16)}</span>
     <div class="lb-txt" data-act="toggle" title="Нажми, чтобы показать целиком">
-      <div class="lb-k">Смотрит лот</div>
-      <div class="lb-v">${esc(p.lotName)}</div>
+      <div class="lb-k">${lot.now ? 'Смотрит лот' : `Смотрел лот${ago ? ' · ' + esc(ago) : ''}`}</div>
+      <div class="lb-v">${esc(lot.n)}</div>
     </div>
-    <button class="ibtn" data-act="copy" data-tip="Скопировать название">${icon('copy', 16)}</button>
-    ${p.lotUrl ? `<button class="btn sm" data-act="open">${icon('external', 14)}Открыть</button>` : ''}`;
+    ${lot.u ? `<button class="ibtn" data-act="copy" data-tip="Скопировать ссылку на лот">${icon('link', 16)}</button>
+    <button class="ibtn" data-act="send" data-tip="Вставить ссылку в сообщение">${icon('send', 16)}</button>
+    <button class="btn sm" data-act="open">${icon('external', 14)}Открыть</button>` : ''}`;
   const v = $('.lb-v', bar);
   requestAnimationFrame(() => bar.classList.toggle('long', v.scrollHeight > v.clientHeight + 1));
   bar.onclick = (e) => {
     const a = e.target.closest('[data-act]')?.dataset.act;
     if (a === 'toggle' && (bar.classList.contains('long') || bar.classList.contains('open'))) bar.classList.toggle('open');
-    if (a === 'copy') copyText(p.lotName);
-    if (a === 'open' && p.lotUrl) S.backend.openBrowser(p.lotUrl);
+    if (a === 'copy') copyText(lot.u).then(() => ok('Ссылка скопирована', '', { ms: 1800 }));
+    if (a === 'send' && ta) {
+      ta.value = (ta.value ? ta.value.trimEnd() + ' ' : '') + lot.u;
+      ta.dispatchEvent(new Event('input'));
+      ta.focus();
+    }
+    if (a === 'open') S.backend.openBrowser(lot.u);
   };
 }
 

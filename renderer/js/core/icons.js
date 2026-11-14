@@ -1,5 +1,9 @@
+// © 2026 Lumen. Все права защищены. Копирование, изменение и распространение этого кода запрещены без разрешения автора (см. LICENSE).
 // Свои линейные иконки 24×24, обводка 1.8.
 const P = {
+  chevL: '<path d="m15 18-6-6 6-6"/>',
+  chevR: '<path d="m9 18 6-6-6-6"/>',
+  home: '<path d="M3 10.5 12 3l9 7.5"/><path d="M5 9v10a2 2 0 0 0 2 2h3.5v-6h3v6H17a2 2 0 0 0 2-2V9"/>',
   chat: '<path d="M21 12a8.5 8.5 0 0 1-12.4 7.6L4 21l1.4-4.4A8.5 8.5 0 1 1 21 12z"/>',
   bag: '<path d="M5 8h14l-1.2 11.2a2 2 0 0 1-2 1.8H8.2a2 2 0 0 1-2-1.8L5 8z"/><path d="M9 10V7a3 3 0 0 1 6 0v3"/>',
   wallet: '<rect x="3" y="6" width="18" height="14" rx="3"/><path d="M3 10h18"/><path d="M16 15h2"/><path d="M6 6l9-3 1.5 3"/>',
@@ -80,3 +84,18 @@ export function icon(name, size = 20, cls = '') {
 }
 
 export const SPARK = '<svg viewBox="0 0 24 24" width="100%" height="100%" fill="#fff"><path d="M12 1.5c.5 5.6 4.9 10 10.5 10.5-5.6.5-10 4.9-10.5 10.5C11.5 16.9 7.1 12.5 1.5 12 7.1 11.5 11.5 7.1 12 1.5z"/></svg>';
+
+/** Логотип Lumen в цвете темы (кольцо и буква берут --a1/--a2). */
+let lg = 0;
+export function logoSvg(size = 40) {
+  const id = 'lg' + ++lg;
+  return `<svg class="lumen-logo" width="${size}" height="${size}" viewBox="0 0 100 100" aria-hidden="true">
+    <defs><linearGradient id="${id}a" x1="15" y1="15" x2="90" y2="70" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="var(--a1)"/><stop offset="1" stop-color="var(--a2)"/></linearGradient>
+    <linearGradient id="${id}b" x1="50" y1="55" x2="40" y2="90" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#000" stop-opacity="0"/><stop offset="1" stop-color="#000" stop-opacity=".6"/></linearGradient>
+    <radialGradient id="${id}g" cx="50" cy="45" r="34" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="var(--a1)" stop-opacity=".2"/><stop offset="1" stop-color="var(--a1)" stop-opacity="0"/></radialGradient></defs>
+    <rect width="100" height="100" rx="22" fill="#0e0f11"/>
+    <circle cx="50" cy="50" r="33" fill="url(#${id}g)"/>
+    <circle cx="50" cy="50" r="33.5" fill="none" stroke="url(#${id}a)" stroke-width="5"/>
+    <circle cx="50" cy="50" r="33.5" fill="none" stroke="url(#${id}b)" stroke-width="5.4"/>
+    <path d="M37 36h10v19h17v8H37z" fill="var(--a1)"/></svg>`;
+}

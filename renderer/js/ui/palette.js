@@ -1,3 +1,4 @@
+// © 2026 Lumen. Все права защищены. Копирование, изменение и распространение этого кода запрещены без разрешения автора (см. LICENSE).
 // Ctrl+K: чаты, заказы, разделы и команды в одном поиске.
 import { el, esc, avatar } from '../core/util.js';
 import { icon } from '../core/icons.js';
@@ -13,7 +14,7 @@ let open = null;
 
 export function palette() {
   if (open) return open.close();
-  const wrap = el(`<div><div class="scrim" style="background:rgba(0,0,0,.25)"></div><div class="palette"><span class="pi-ic">${icon('search', 20)}</span><input placeholder="Чат, номер заказа или команда…" spellcheck="false"><div class="pal-list"></div></div></div>`);
+  const wrap = el(`<div><div class="scrim" style="background:rgba(0,0,0,.25)"></div><div class="palette"><span class="pi-ic">${icon('search', 20)}</span><input placeholder="Чат, #заказ, ID или ссылка на профиль, команда…" spellcheck="false"><div class="pal-list"></div></div></div>`);
   const inp = wrap.querySelector('input');
   const list = wrap.querySelector('.pal-list');
   let sel = 0,
@@ -28,6 +29,9 @@ export function palette() {
   const cmds = [
     { t: 'Чаты', ic: 'chat', k: 'Ctrl 1', run: () => bus.emit('nav', 'chats') },
     { t: 'Сделки', ic: 'bag', k: 'Ctrl 2', run: () => bus.emit('nav', 'deals') },
+    { t: 'Главная', ic: 'home', k: 'Ctrl 0', run: () => bus.emit('nav', 'home') },
+    { t: 'Статистика', ic: 'trend', run: () => bus.emit('nav', 'stats') },
+    { t: 'Поддержка FunPay: не подтвердили заказ', ic: 'alert', run: () => import('../features/support.js').then((m) => m.openSupportPicker()) },
     { t: 'Финансы', ic: 'wallet', k: 'Ctrl 3', run: () => bus.emit('nav', 'finance') },
     { t: 'Лоты', ic: 'box', k: 'Ctrl 4', run: () => bus.emit('nav', 'lots') },
     { t: 'Автоматика и плагины', ic: 'bot', k: 'Ctrl 5', run: () => bus.emit('nav', 'auto') },
@@ -44,7 +48,10 @@ export function palette() {
     const q = inp.value.trim().toLowerCase();
     items = [];
     const oid = /^#?([a-z0-9]{8})$/i.exec(q);
-    if (oid) items.push({ sec: 'Заказ', t: `Открыть заказ #${oid[1].toUpperCase()}`, ic: 'bag', run: () => openOrder(oid[1].toUpperCase()) });
+    if (oid && !/^\d+$/.test(oid[1])) items.push({ sec: 'Заказ', t: `Открыть заказ #${oid[1].toUpperCase()}`, ic: 'bag', run: () => openOrder(oid[1].toUpperCase()) });
+    // пользователь: ID или ссылка на профиль FunPay
+    const uid = /(?:funpay\.com\/(?:[a-z]{2}\/)?users\/)?(\d{3,12})\/?$/i.exec(inp.value.trim());
+    if (uid && (/users\//i.test(inp.value) || /^\d{3,12}$/.test(q))) items.push({ sec: 'Пользователь', t: `Открыть профиль ID ${uid[1]}`, sub: 'профиль FunPay в Lumen', ic: 'user', run: () => openProfile(uid[1]) });
     const chats = CS.chats.filter((c) => !q || c.name.toLowerCase().includes(q) || c.preview.toLowerCase().includes(q)).slice(0, q ? 8 : 5);
     for (const c of chats) items.push({ sec: 'Чаты', t: c.name, sub: c.preview, av: c, run: () => (bus.emit('nav', 'chats'), bus.emit('open-chat', c.id)) });
     for (const c of cmds.filter((c) => !q || c.t.toLowerCase().includes(q))) items.push({ sec: 'Команды', ...c });

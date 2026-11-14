@@ -1,3 +1,4 @@
+// © 2026 Lumen. Все права защищены. Копирование, изменение и распространение этого кода запрещены без разрешения автора (см. LICENSE).
 const { app, BrowserWindow, ipcMain, Tray, Menu, nativeImage, shell, Notification, screen, session, nativeTheme, clipboard, protocol } = require('electron');
 const fs = require('fs');
 const path = require('path');
@@ -6,6 +7,7 @@ const { Session, cleanKey, UA } = require('./fp');
 const updater = require('./updater');
 const automation = require('./automation');
 const discord = require('./discord');
+const backup = require('./backup');
 
 const ROOT = path.join(__dirname, '..');
 const ICON = path.join(ROOT, 'assets', process.platform === 'win32' ? 'icon.ico' : 'icon.png');
@@ -101,6 +103,47 @@ handle('store:get', (key, def) => store.get(key, def));
 handle('store:set', (key, value) => store.set(key, value));
 
 handle('app:clipboard', () => clipboard.readText());
+// Бэкап и перенос
+handle('backup:make', (parts) => backup.save(win, parts));
+handle('backup:open', () => backup.open(win));
+handle('backup:apply', (token, parts) => backup.apply(token, parts, { addAccount, automation }));
+
+// Свой фон окна: картинка, GIF или видео — лежит файлом рядом с настройками
+const BG_TYPES = ['image/png', 'image/jpeg', 'image/webp', 'image/gif', 'video/mp4', 'video/webm'];
+const bgFile = () => path.join(app.getPath('userData'), 'background.bin');
+handle('app:bgGet', () => {
+  const type = store.get('bgType', '');
+  if (!type || !fs.existsSync(bgFile())) return null;
+  return { type, data: fs.readFileSync(bgFile()) };
+});
+handle('app:bgSet', (data, type) => {
+  if (!BG_TYPES.includes(type)) throw new Error('Нужна картинка (PNG, JPG, WEBP, GIF) или видео (MP4, WEBM)');
+  const buf = Buffer.from(data);
+  if (buf.length > 60 * 1024 * 1024) throw new Error('Файл больше 60 МБ — возьми поменьше');
+  fs.writeFileSync(bgFile(), buf);
+  store.set('bgType', type);
+  return true;
+});
+handle('app:bgClear', () => {
+  try {
+    fs.unlinkSync(bgFile());
+  } catch {}
+  store.set('bgType', '');
+  return true;
+});
+handle('app:zoom', (f) => {
+  // «Авто»: на большом мониторе без масштабирования Windows (2K/4K на 100%) делаем чуть крупнее
+  if (f === 'auto') {
+    let d = null;
+    try {
+      d = screen.getDisplayMatching(win.getBounds());
+    } catch {}
+    f = d && d.scaleFactor < 1.5 && d.size.width >= 2400 ? 1.15 : d && d.scaleFactor < 1.25 && d.size.width >= 1900 && d.size.height >= 1200 ? 1.1 : 1;
+  }
+  const z = Math.min(1.5, Math.max(0.8, Number(f) || 1));
+  if (win && !win.isDestroyed()) win.webContents.setZoomFactor(z);
+  return z;
+});
 handle('app:copy', (t) => (clipboard.writeText(String(t ?? '')), true));
 
 // Украшения ников Lumen FX: список с сервера (как у расширения Lumen). Копия хранится на случай без интернета.
@@ -134,6 +177,30 @@ function lumenIid() {
   }
   return iid;
 }
+// «Клуб Lumen»: отметиться, что этот профиль FunPay сидит в Lumen Desktop (значок у ника), и получить список
+let clubCache = { at: 0, data: null };
+handle('club:hi', async (fpId, on) => {
+  const u = String(fpId || '').replace(/\D/g, '');
+  if (!u) return false;
+  const k = lumenIid();
+  try {
+    await fetch(`${LUMEN_API}/${on ? 'hi' : 'bye'}?u=${u}&k=${k}&c=desk`, { headers: { 'User-Agent': 'Lumen-Desktop' } });
+    clubCache.at = 0;
+    return true;
+  } catch {
+    return false;
+  }
+});
+handle('club:list', async () => {
+  if (clubCache.data && Date.now() - clubCache.at < 20 * 60e3) return clubCache.data;
+  try {
+    const r = await fetch(LUMEN_API + '/club.json', { headers: { 'User-Agent': 'Lumen-Desktop' } });
+    const d = await r.json();
+    const num = (a) => (Array.isArray(a) ? a.filter((x) => Number.isFinite(+x)).map(Number).slice(0, 200000) : []);
+    clubCache = { at: Date.now(), data: { ids: num(d.ids), d: num(d.d), m: num(d.m) } };
+  } catch {}
+  return clubCache.data || { ids: [], d: [], m: [] };
+});
 handle('lumen:api', async (p, method, body) => {
   p = String(p || '');
   if (!/^\/api\/(chat(\/(login|me|send))?|online)(\?|$)/.test(p)) throw new Error('bad path');
@@ -169,6 +236,31 @@ handle('upd:install', () => {
   quitting = true;
   store.flush();
   updater.install();
+});
+// Новости Lumen для колокольчика (пишет админ в боте). Кэш 3 минуты, без интернета — последняя копия.
+let newsCache = { at: 0, items: null };
+handle('app:news', async () => {
+  if (newsCache.items && Date.now() - newsCache.at < 3 * 60e3) return newsCache.items;
+  try {
+    const ctl = new AbortController();
+    const t = setTimeout(() => ctl.abort(), 12000);
+    const r = await fetch(LUMEN_API + '/api/news', { signal: ctl.signal, headers: { 'User-Agent': 'Lumen-Desktop' } });
+    clearTimeout(t);
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    const d = await r.json();
+    const items = (Array.isArray(d.items) ? d.items : []).slice(0, 20).map((n) => ({
+      id: Number(n.id) || 0,
+      title: String(n.title || '').slice(0, 120),
+      text: String(n.text || '').slice(0, 1000),
+      url: /^https:\/\/[^\s]+$/.test(String(n.url || '')) ? String(n.url) : '',
+      ts: Number(n.ts) || 0,
+    }));
+    newsCache = { at: Date.now(), items };
+    store.set('newsCache', items);
+    return items;
+  } catch {
+    return newsCache.items || store.get('newsCache', []);
+  }
 });
 // «Что нового» — один раз после обновления: раздел CHANGELOG.md для текущей версии
 handle('app:whatsNew', () => {

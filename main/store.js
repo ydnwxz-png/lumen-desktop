@@ -1,3 +1,4 @@
+// © 2026 Lumen. Все права защищены. Копирование, изменение и распространение этого кода запрещены без разрешения автора (см. LICENSE).
 // Хранилище в %APPDATA%/Lumen Desktop/lumen.json. golden_key шифруется системой (safeStorage), если она умеет.
 const fs = require('fs');
 const path = require('path');
@@ -65,6 +66,9 @@ module.exports = {
   set(key, value) {
     load().kv[key] = value;
     save();
+  },
+  keys() {
+    return Object.keys(load().kv);
   },
   accounts() {
     return load().accounts;

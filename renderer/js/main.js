@@ -1,6 +1,7 @@
+// © 2026 Lumen. Все права защищены. Копирование, изменение и распространение этого кода запрещены без разрешения автора (см. LICENSE).
 // Запуск, навигация, аккаунты, горячие клавиши.
 import { $, $$, el, esc, avatar } from './core/util.js';
-import { icon } from './core/icons.js';
+import { icon, logoSvg } from './core/icons.js';
 import { S, bus, loadSettings, loadMeta, saveSettings } from './core/state.js';
 import { applyLook } from './ui/look.js';
 import { initTips, menu, err, toast, modal } from './ui/kit.js';
@@ -14,8 +15,13 @@ import { createDemo } from './fp/demo.js';
 import { start as startPoll, stop as stopPoll, pollNow, CS } from './features/poller.js';
 import { resetRaise } from './features/raise.js';
 import { loadLater, dndTick, dndOn, dndOff } from './features/later.js';
-import { myNick } from './features/nicks.js';
+import { myNick, nickHtml } from './features/nicks.js';
 import { mountChats, chatKeys } from './views/chats.js';
+import { mountHome, showHome } from './views/home.js';
+import { mountStatsView, showStatsView } from './views/statsv.js';
+import { openSupportPicker } from './features/support.js';
+import { initBell } from './features/bell.js';
+import { initClub } from './features/club.js';
 import { mountDeals, showDeals } from './views/deals.js';
 import { mountFinance, showFinance } from './views/finance.js';
 import { mountLots, showLots } from './views/lots.js';
@@ -28,8 +34,10 @@ import { showLogin } from './views/login.js';
 import { openProfile } from './views/profile.js';
 
 const NAV = [
+  ['home', 'Главная', 'home'],
   ['chats', 'Чаты', 'chat'],
   ['deals', 'Сделки', 'bag'],
+  ['stats', 'Статистика', 'trend'],
   ['finance', 'Финансы', 'wallet'],
   ['lots', 'Лоты', 'box'],
   ['auto', 'Автоматика и плагины', 'bot'],
@@ -37,31 +45,25 @@ const NAV = [
 ];
 
 function shell() {
-  const app = el(`<div id="app">
-    <header class="titlebar">
-      <div class="brand"><img class="brand-logo" src="../assets/icon.png" alt="">Lumen<small data-me-name></small></div>
-      <button class="tb-search" data-pal>${icon('search', 15)}Поиск чатов, заказов, команд<span class="kbd">Ctrl K</span></button>
-      <div class="tb-right">
+  const app = el(`<div id="app" class="lx">
+    <div class="mainc">
+      <header class="titlebar topbar">
+        <button class="tb-search" data-pal>${icon('search', 15)}<span class="grow">Поиск чатов, заказов, команд</span><span class="kbd">Ctrl K</span></button>
+        <span class="tb-drag"></span>
         <button class="upd-chip hidden" data-upd></button>
         <button class="dnd-chip hidden" data-dnd data-tip="«Не беспокоить» включено. Нажми, чтобы выключить">${icon('moon', 14)}<span>Не беспокоить</span></button>
         <span class="demo-chip hidden" data-demo>ДЕМО</span>
+        <button class="dnd-chip hidden" data-hidechip data-tip="Данные скрыты (для стрима). Нажми или Ctrl+Shift+H — показать">${icon('eyeOff', 14)}<span>Скрыто</span></button>
         <div class="tb-status load" data-status><span class="dot"></span><span data-st-t>Подключаюсь…</span></div>
+        <button class="tb-bell" data-bell data-tip="Уведомления">${icon('bell', 18)}<span class="bdot hidden"></span></button>
+        <button class="acc-chip" data-accchip><span data-acc-av></span><span class="acc-t"><b data-me-name></b><small data-me-sub></small></span>${icon('chevR', 15, 'acc-chev')}</button>
         <span data-wctl></span>
-      </div>
-    </header>
-    <div class="shell">
-      <nav class="rail">
-        <span class="rail-ind"></span>
-        ${NAV.map(([id, n, ic]) => `<button class="rail-btn" data-nav="${id}" data-tip="${n}">${icon(ic, 22)}${id === 'chats' ? '<span class="badge hidden" data-unread></span>' : ''}</button>`).join('')}
-        <span class="rail-plugs" data-plugrail></span>
-        <span class="rail-sp"></span>
-        <button class="rail-btn" data-browser data-tip="FunPay в браузере">${icon('globe', 21)}</button>
-        <button class="rail-btn" data-nav="settings" data-tip="Настройки">${icon('settings', 21)}</button>
-        <button class="rail-me" data-me></button>
-      </nav>
+      </header>
       <main class="stage">
+        <section class="view" id="v-home"></section>
         <section class="view" id="v-chats"></section>
         <section class="view" id="v-deals"></section>
+        <section class="view" id="v-stats"></section>
         <section class="view" id="v-finance"></section>
         <section class="view" id="v-lots"></section>
         <section class="view" id="v-plug"></section>
@@ -70,11 +72,22 @@ function shell() {
         <section class="view" id="v-settings"></section>
         <section class="view" id="v-error"></section>
       </main>
-    </div></div>`);
+    </div>
+    <nav class="rail">
+      <div class="rail-logo">${logoSvg(40)}</div>
+      ${NAV.map(([id, n, ic]) => `<button class="rail-btn" data-nav="${id}" data-tip="${n}">${icon(ic, 21)}${id === 'chats' ? '<span class="badge hidden" data-unread></span>' : ''}</button>`).join('')}
+      <span class="rail-plugs" data-plugrail></span>
+      <span class="rail-sp"></span>
+      <button class="rail-btn" data-browser data-tip="FunPay во встроенном браузере">${icon('globe', 20)}</button>
+      <button class="rail-btn" data-nav="settings" data-tip="Настройки">${icon('settings', 20)}</button>
+    </nav>
+  </div>`);
   app.querySelector('[data-wctl]').replaceWith(winControls());
   document.body.append(app);
+  mountHome($('#v-home'));
   mountChats($('#v-chats'));
   mountDeals($('#v-deals'));
+  mountStatsView($('#v-stats'));
   mountFinance($('#v-finance'));
   mountLots($('#v-lots'));
   mountPluginPages($('#v-plug'));
@@ -85,10 +98,10 @@ function shell() {
     const n = e.target.closest('[data-nav]');
     if (n) go(n.dataset.nav);
     if (e.target.closest('[data-browser]')) S.backend?.openBrowser('https://funpay.com/');
-    const me = e.target.closest('[data-me]');
-    if (me) meMenu(me);
   };
   $('[data-pal]').onclick = palette;
+  $('[data-accchip]').onclick = (e) => accPop(e.currentTarget, true);
+  $('[data-hidechip]').onclick = () => toggleHide(false);
   $('[data-dnd]').onclick = () => toggleDnd(false);
   $('[data-upd]').onclick = () => {
     const st = S.update || {};
@@ -96,6 +109,27 @@ function shell() {
     else if (st.state === 'manual' || st.state === 'available') window.api.upd.download();
   };
   addEventListener('resize', moveInd);
+  applyNav();
+}
+
+/** Панель разделов: слева, сверху или снизу; скрытые разделы. */
+function applyNav() {
+  const n = S.settings.nav || {};
+  const pos = ['top', 'bottom'].includes(n.pos) ? n.pos : 'left';
+  document.documentElement.dataset.navpos = pos;
+  // сверху — кнопки прямо в верхней полосе (между поиском и уведомлениями), иначе — отдельной панелью
+  const rail = $('.rail');
+  if (pos === 'top') $('.tb-drag').before(rail);
+  else if (rail.parentElement !== $('#app')) $('#app').append(rail);
+  const hide = new Set(n.hide || []);
+  $$('.rail-btn[data-nav]').forEach((b) => (b.hidden = hide.has(b.dataset.nav) && b.dataset.nav !== 'settings' && b.dataset.nav !== 'home'));
+  const z = S.settings.zoom === 'auto' ? 'auto' : Math.min(1.5, Math.max(0.8, +S.settings.zoom || 1));
+  window.api?.app.zoom?.(z).catch?.(() => {});
+  document.documentElement.dataset.contrast = S.settings.contrast === 'normal' ? 'normal' : 'high';
+  // режим «для стрима»: размыть выбранное
+  const h = S.settings.hide || {};
+  document.documentElement.dataset.hide = h.on ? ['nick', 'balance', 'buyers', 'orders', 'lots'].filter((k) => h[k]).join(' ') : '';
+  $('[data-hidechip]')?.classList.toggle('hidden', !h.on);
 }
 
 function moveInd() {
@@ -114,7 +148,9 @@ export function go(view, sub) {
   $$('.view').forEach((v) => v.classList.toggle('on', v.id === 'v-' + sec));
   $$('.rail-btn[data-nav]').forEach((b) => b.classList.toggle('on', b.dataset.nav === view));
   moveInd();
+  if (view === 'home') showHome();
   if (view === 'deals') showDeals();
+  if (view === 'stats') showStatsView();
   if (view === 'finance') showFinance();
   if (view === 'lots') showLots();
   if (view === 'auto') showAutomation();
@@ -126,28 +162,77 @@ export function go(view, sub) {
 
 function renderMe() {
   const me = S.me;
-  $('[data-me]').innerHTML = me ? avatar(me.avatar, me.username, 38) : '';
-  $('[data-me]').dataset.tip = me ? me.username : '';
-  $('[data-me-name]').innerHTML = me ? `· ${myNick(me.username)}` : '';
+  $('[data-acc-av]').innerHTML = me ? avatar(me.avatar, me.username, 34) : '';
+  $('[data-me-name]').innerHTML = me ? myNick(me.username) : '';
+  $('[data-me-sub]').textContent = me ? `@${me.username}${me.balance ? ' · ' + me.balance : ''}` : '';
+  $('[data-accchip]').classList.toggle('hidden', !me);
   $('[data-demo]').classList.toggle('hidden', !S.demo);
 }
 
-async function meMenu(btn) {
-  const r = btn.getBoundingClientRect();
+// Аккаунт: кто сейчас, переключение, добавить, профиль, «Не беспокоить», выход
+let accOpen = null;
+async function accPop(btn, top = false) {
+  if (accOpen) return accOpen();
+  const me = S.me;
   const dnd = dndTick();
-  const items = [
-    { header: S.me?.username || '' },
-    { label: 'Мой профиль', icon: 'user', run: () => openProfile(S.me.userId) },
-    { label: 'Стиль ника', icon: 'sparkles', run: () => go('settings', 'nick') },
-    { label: dnd ? 'Выключить «Не беспокоить»' : 'Не беспокоить', icon: dnd ? 'bell' : 'moon', run: () => toggleDnd(!dnd) },
-    '-',
-  ];
-  if (window.api) {
-    const { list, active } = await window.api.acc.list();
-    for (const a of list) if (a.id !== active || S.demo) items.push({ label: a.username, icon: 'users', hint: 'переключиться', run: () => startAccount(a.id) });
-    items.push({ label: 'Добавить аккаунт', icon: 'plus', run: addAccount }, '-', { label: 'Выйти из программы', icon: 'power', danger: true, run: () => window.api.app.quit() });
-  } else items.push({ label: 'Выйти из демо', icon: 'logout', run: () => location.reload() });
-  menu(r.right + 10, r.bottom - 260, items);
+  let list = [];
+  let active = '';
+  if (window.api) ({ list, active } = await window.api.acc.list());
+  const p = el(`<div class="pop2" style="width:330px">
+    <h4>Аккаунты FunPay</h4>
+    <div class="acc-it on">${avatar(me?.avatar, me?.username, 42)}<div style="min-width:0"><b class="ell">${me ? myNick(me.username) : '—'}</b><span>${S.demo ? 'демо' : 'сейчас открыт'}${me?.balance ? ' · ' + esc(me.balance) : ''}</span></div><span class="r" style="color:var(--a1)">${icon('check', 18)}</span></div>
+    ${list.filter((a) => a.id !== active || S.demo).map((a) => `<button class="acc-it" data-acc="${esc(a.id)}">${avatar(a.avatar || '', a.username, 42)}<div style="min-width:0"><b class="ell">${nickHtml(a.username, 'none', '', '', '', a.userId)}</b><span>переключиться</span></div></button>`).join('')}
+    ${window.api ? `<button class="acc-add" data-add>${icon('plus', 17)}Добавить аккаунт FunPay</button>` : ''}
+    <div class="sepl"></div>
+    <button class="row-it" data-prof>${icon('user', 17)}Мой профиль</button>
+    <button class="row-it" data-nick>${icon('sparkles', 17)}Стиль ника</button>
+    <button class="row-it" data-sup>${icon('alert', 17)}Поддержка FunPay: не подтвердили заказ</button>
+    <button class="row-it" data-hidet>${icon(S.settings.hide?.on ? 'eye' : 'eyeOff', 17)}${S.settings.hide?.on ? 'Показать скрытые данные' : 'Скрыть данные (для стрима)'}</button>
+    <button class="row-it" data-dndt>${icon(dnd ? 'bell' : 'moon', 17)}${dnd ? 'Выключить «Не беспокоить»' : 'Не беспокоить'}</button>
+    <div class="sepl"></div>
+    ${window.api ? `<button class="row-it bad" data-quit>${icon('power', 17)}Выйти из программы</button>` : `<button class="row-it bad" data-demoexit>${icon('logout', 17)}Выйти из демо</button>`}
+  </div>`);
+  document.body.append(p);
+  const r = btn.getBoundingClientRect();
+  if (top) {
+    p.style.left = Math.max(8, r.right - p.offsetWidth) + 'px';
+    p.style.top = r.bottom + 10 + 'px';
+  } else {
+    p.style.left = r.right + 12 + 'px';
+    p.style.top = Math.max(8, Math.min(innerHeight - p.offsetHeight - 8, r.bottom - p.offsetHeight + 6)) + 'px';
+  }
+  const close = () => {
+    p.remove();
+    accOpen = null;
+    removeEventListener('mousedown', out, true);
+    removeEventListener('keydown', esc_, true);
+  };
+  const out = (e) => !p.contains(e.target) && !e.target.closest('[data-accchip]') && close();
+  const esc_ = (e) => e.key === 'Escape' && close();
+  setTimeout(() => (addEventListener('mousedown', out, true), addEventListener('keydown', esc_, true)));
+  accOpen = close;
+  p.onclick = (e) => {
+    const t = e.target.closest('button');
+    if (!t) return;
+    close();
+    if (t.dataset.acc) startAccount(t.dataset.acc);
+    else if (t.hasAttribute('data-add')) addAccount();
+    else if (t.hasAttribute('data-prof')) openProfile(S.me.userId);
+    else if (t.hasAttribute('data-nick')) go('settings', 'nick');
+    else if (t.hasAttribute('data-dndt')) toggleDnd(!dnd);
+    else if (t.hasAttribute('data-sup')) openSupportPicker();
+    else if (t.hasAttribute('data-hidet')) toggleHide();
+    else if (t.hasAttribute('data-quit')) window.api.app.quit();
+    else if (t.hasAttribute('data-demoexit')) location.reload();
+  };
+}
+
+/** Режим «для стрима»: размыть ник, баланс, покупателей, номера заказов. */
+function toggleHide(on = !S.settings.hide?.on) {
+  S.settings.hide = { ...(S.settings.hide || {}), on };
+  saveSettings();
+  applyNav();
+  toast(on ? 'Данные скрыты' : 'Данные снова видны', on ? 'Ник, баланс, покупатели и заказы размыты. Ctrl+Shift+H — показать' : '', { kind: 'ok', ms: 2200 });
 }
 
 function toggleDnd(on) {
@@ -190,6 +275,7 @@ function showInstalling(v) {
 /** «Что нового» — один раз после обновления. */
 function mdLite(t) {
   return t.split('\n').filter((l) => l.trim()).map((l) => {
+    if (/^\*\*[^*]+\*\*$/.test(l.trim())) return `<li class="hd">${esc(l.trim().slice(2, -2))}</li>`;
     const sub = /^\s{2,}[-*]\s/.test(l);
     const txt = esc(l.replace(/^\s*[-*]\s/, '')).replace(/`([^`]+)`/g, '<code>$1</code>').replace(/\*\*([^*]+)\*\*/g, '<b>$1</b>');
     return `<li class="${sub ? 'sub' : ''}">${txt}</li>`;
@@ -243,7 +329,7 @@ async function startAccount(id) {
   syncPluginRail(null);
   if (!S.demo && window.api?.auto) window.api.auto.attach(id, S.settings.automation?.mode === 'pc' ? 'pc' : 'off').then(syncPluginRail, (e) => console.warn('автоматика:', e));
   resetRaise();
-  go(S.view && S.view !== 'error' ? S.view : 'chats');
+  go(S.view && S.view !== 'error' ? S.view : 'home');
 }
 
 function showError(e, id) {
@@ -259,12 +345,16 @@ function showError(e, id) {
 
 function setStatus(s, msg = '') {
   const st = $('[data-status]');
-  st.className = 'tb-status ' + (s === 'ok' ? '' : s);
+  // «На связи» не показываем — значок появляется только когда подключаемся или связи нет
+  st.className = 'tb-status ' + (s === 'ok' ? 'ok-quiet' : s);
   $('[data-st-t]').textContent = s === 'ok' ? (S.demo ? 'Демо' : 'На связи') : s === 'load' ? 'Подключаюсь…' : 'Нет связи';
   st.dataset.tip = msg || (s === 'ok' ? 'Сообщения обновляются автоматически' : '');
 }
 
 function keys(e) {
+  if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.code === 'KeyH') return e.preventDefault(), toggleHide();
+  // Escape — убрать фокус с кнопки, чтобы не оставалась рамка
+  if (e.key === 'Escape' && document.activeElement?.matches?.('button, summary, a')) document.activeElement.blur();
   if (document.querySelector('#login')) return;
   const k = e.key.toLowerCase();
   if ((e.ctrlKey || e.metaKey) && (k === 'k' || k === 'л')) {
@@ -273,6 +363,9 @@ function keys(e) {
   } else if ((e.ctrlKey || e.metaKey) && /^Digit[1-6]$/.test(e.code)) {
     e.preventDefault();
     go(['chats', 'deals', 'finance', 'lots', 'auto', 'settings'][+e.code.slice(5) - 1]);
+  } else if ((e.ctrlKey || e.metaKey) && e.code === 'Digit0') {
+    e.preventDefault();
+    go('home');
   } else if ((e.ctrlKey || e.metaKey) && (k === 'f' || k === 'а') && S.view === 'chats') {
     e.preventDefault();
     $('#chat-q')?.focus();
@@ -294,11 +387,13 @@ async function boot() {
   shell();
   initFx();
   initWatch();
+  initBell();
+  initClub();
   bus.on('nav', (v, sub) => go(v, sub));
   bus.on('status', setStatus);
   bus.on('switch-account', startAccount);
   bus.on('add-account', addAccount);
-  bus.on('settings', () => (renderMe(), dndTick()));
+  bus.on('settings', () => (renderMe(), dndTick(), applyNav()));
   bus.on('dnd', (a) => $('[data-dnd]').classList.toggle('hidden', !a));
   bus.on('me', renderMe);
   bus.on('auto-sent', () => toast('Автоответ отправлен', '', { kind: 'ok', icon: 'bot', ms: 2500 }));

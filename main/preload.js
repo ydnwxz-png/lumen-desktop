@@ -1,3 +1,4 @@
+// © 2026 Lumen. Все права защищены. Копирование, изменение и распространение этого кода запрещены без разрешения автора (см. LICENSE).
 const { contextBridge, ipcRenderer } = require('electron');
 
 const call = async (ch, ...args) => {
@@ -29,6 +30,16 @@ contextBridge.exposeInMainWorld('api', {
   app: {
     info: () => call('app:info'),
     whatsNew: () => call('app:whatsNew'),
+    news: () => call('app:news'),
+    zoom: (f) => call('app:zoom', f),
+    clubHi: (id, on) => call('club:hi', id, on),
+    club: () => call('club:list'),
+    bgGet: () => call('app:bgGet'),
+    bgSet: (data, type) => call('app:bgSet', data, type),
+    bgClear: () => call('app:bgClear'),
+    backupMake: (parts) => call('backup:make', parts),
+    backupOpen: () => call('backup:open'),
+    backupApply: (token, parts) => call('backup:apply', token, parts),
     discord: (opts) => call('app:discord', opts),
     discordAvailable: () => call('app:discordAvailable'),
     clipboard: () => call('app:clipboard'),

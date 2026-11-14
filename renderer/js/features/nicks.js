@@ -1,3 +1,4 @@
+// © 2026 Lumen. Все права защищены. Копирование, изменение и распространение этого кода запрещены без разрешения автора (см. LICENSE).
 import { esc } from '../core/util.js';
 import { S, meta } from '../core/state.js';
 

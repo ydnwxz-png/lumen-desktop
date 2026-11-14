@@ -1,3 +1,4 @@
+// © 2026 Lumen. Все права защищены. Копирование, изменение и распространение этого кода запрещены без разрешения автора (см. LICENSE).
 // Настройки, шаблоны и прочее сохраняемое + шина событий.
 const hasApi = typeof window.api !== 'undefined';
 
@@ -27,6 +28,11 @@ export const DEFAULT_SETTINGS = {
   bg: 'aurora', // aurora | solid | oled
   density: 'comfortable',
   fontSize: 14,
+  zoom: 'auto', // масштаб окна: 'auto' или 0.9 … 1.5
+  contrast: 'high',
+  clubShow: false, // показывать другим значок Lumen у моего ника (включает сам человек)
+  hide: { on: false, nick: true, balance: true, buyers: true, orders: true, lots: false }, // режим «для стрима» // чёткость текста: normal | high
+  nav: { pos: 'left', hide: [] }, // где панель разделов: left | top | bottom; какие разделы скрыть
   animations: true,
   notify: { mode: 'lumen', corner: 'br', sound: true, volume: 0.55, msgSound: 'lumen', orderSound: 'coins', preview: true, whenFocused: false, orders: true, allAccounts: true },
   pollInterval: 3,
@@ -91,6 +97,12 @@ export async function loadSettings() {
   // 1.6: фирменный цвет Lumen — зелёный, как в расширении. Старый фиолетовый «по умолчанию» меняем один раз.
   if (!S.settings.green && S.settings.accent === 'violet') S.settings.accent = 'lumen';
   S.settings.green = true;
+  // 1.9.4: готовые темы больше не красят панели — старый «оттенок» от них убираем один раз
+  if (!S.settings.tintFix && ['#b06aa4', '#a3261c', '#6d4bd8'].includes(String(S.settings.tint || '').toLowerCase())) S.settings.tint = '';
+  S.settings.tintFix = true;
+  // 1.9.5: масштаб по умолчанию — «Авто» (на 2K-мониторе крупнее)
+  if (!S.settings.zoomFix && (S.settings.zoom === 1 || S.settings.zoom == null)) S.settings.zoom = 'auto';
+  S.settings.zoomFix = true;
   S.templates = await persist.get('templates', null);
   if (!Array.isArray(S.templates)) S.templates = structuredClone(DEFAULT_TEMPLATES);
 }
