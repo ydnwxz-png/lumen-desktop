@@ -1,3 +1,4 @@
+// © 2026 Lumen. Все права защищены. Копирование, изменение и распространение этого кода запрещены без разрешения автора (см. LICENSE).
 // Разбор страниц FunPay в Node (как в движке автоматики): те же проверки, что в parse.test.html, но через linkedom.
 import { ensureDOM } from '../engine/node.js';
 await ensureDOM();

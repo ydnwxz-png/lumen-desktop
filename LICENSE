@@ -1,21 +1,52 @@
-MIT License
+Lumen — лицензия
 
-Copyright (c) 2026 Lumen
+© 2026 Lumen. Все права защищены.
 
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
+Программа Lumen, её исходный код, интерфейс, дизайн, иконки, логотип, тексты
+и другие материалы в этом репозитории принадлежат автору Lumen.
 
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
+МОЖНО:
+  • скачивать программу из раздела Releases и бесплатно пользоваться ею;
+  • смотреть исходный код в этом репозитории, чтобы проверить, как работает
+    программа, и запускать её из исходников для себя;
+  • писать свои плагины для Lumen по инструкции docs/PLUGINS.md.
 
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
+ЗАПРЕЩЕНО без письменного разрешения автора:
+  • копировать исходный код полностью или частями;
+  • изменять код и распространять изменённые версии;
+  • выкладывать программу или её код в других местах, продавать их,
+    выдавать за свои;
+  • использовать код, дизайн, логотип и название Lumen в других проектах.
+
+Возможность сделать форк на GitHub даёт только сама площадка GitHub и не даёт
+никаких прав на использование кода сверх перечисленного выше.
+
+Программа предоставляется «как есть», без каких-либо гарантий. Автор не отвечает
+за возможные убытки от её использования.
+
+Отдельные части кода основаны на стороннем коде под лицензией MIT —
+их лицензии и авторы указаны в файле NOTICE.txt. Шрифт Inter распространяется
+по лицензии SIL Open Font License. Эти части остаются под своими лицензиями.
+
+Lumen не связан с FunPay.
+
+Вопросы и разрешения: https://t.me/Lumen_Funpay
+
+---------------------------------------------------------------------------
+
+Lumen — License
+
+© 2026 Lumen. All rights reserved.
+
+You may download and use the official builds from Releases, view the source code
+in this repository and run it for personal use, and write plugins for Lumen.
+
+Without written permission from the author you may NOT copy the source code
+in whole or in part, modify it, redistribute original or modified versions,
+sell it, present it as your own, or use the code, design, logo or the Lumen name
+in other projects.
+
+The software is provided "as is", without warranty of any kind.
+
+Parts of the code are based on third-party code under the MIT License; their
+notices are kept in NOTICE.txt and those parts remain under their own licenses.

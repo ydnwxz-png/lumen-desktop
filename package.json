@@ -1,11 +1,11 @@
 {
   "name": "lumen-desktop",
   "productName": "Lumen",
-  "version": "1.8.1",
+  "version": "1.9.0",
   "description": "Lumen — красивый десктопный клиент FunPay: чаты, сделки, лоты, шаблоны",
   "main": "main/main.js",
   "author": "Lumen",
-  "license": "MIT",
+  "license": "SEE LICENSE IN LICENSE",
   "scripts": {
     "start": "electron .",
     "dist:win": "electron-builder --win",
@@ -87,7 +87,8 @@
       "owner": "ydnwxz-png",
       "repo": "lumen-desktop",
       "releaseType": "release"
-    }
+    },
+    "copyright": "© 2026 Lumen. Все права защищены."
   },
   "dependencies": {
     "electron-updater": "^6.6.2",
