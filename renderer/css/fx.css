@@ -147,3 +147,8 @@ html img.lm-fr.lm-fr { background-image: linear-gradient(#2a2d36, #2a2d36), coni
 /* список чатов: украшенный ник по ширине текста, время — справа */
 .ci-top .ci-name.lm-fx { flex: 0 1 auto; }
 .ci-top:has(.lm-fx) .ci-time { margin-left: auto; }
+
+/* тёмные рамки (сигил, иней, крылья…): рисунок поверх аватарки */
+.av.lm-frx-host { overflow: visible; }
+.av.lm-frx-host > img { border-radius: 50%; }
+.av.lm-frx-host > canvas.lm-frx { z-index: 3; }

@@ -4,6 +4,8 @@
 // Ник в разметке: <span class="nick" data-uid="123">name</span>, аватарка: <span class="av" data-uid="123">.
 import '../vendor/fx-core.js';
 import '../vendor/deco-art.js';
+import '../vendor/frames-img.js';
+import '../vendor/frames-art.js';
 import { S } from '../core/state.js';
 
 const FXC = window.LumenFX;
@@ -172,14 +174,21 @@ function deco(el, st, place) {
 }
 
 function frame(av, st) {
-  const sig = st && st.fr ? st.fr + st.c.join('') : '';
+  const sig = st && st.fr ? st.fr + (st.fc || '') + st.c.join('') + (document.documentElement.dataset.theme === 'light' ? 'L' : '') : '';
   if ((av.dataset.lmfr || '') === sig) return;
+  if (av._frx) (av._frx(), (av._frx = null));
   av.classList.remove(...[...av.classList].filter((c) => c.startsWith('lm-fr')));
   ['--frw', '--frimg', '--fx1', '--fx2', '--fx3', '--fx1a', '--fx2a'].forEach((p) => av.style.removeProperty(p));
   delete av.dataset.lmfr;
   if (!sig) return;
   av.dataset.lmfr = sig;
   const w = av.getBoundingClientRect().width || 40;
+  // тёмные рамки (сигил, иней, крылья…) — рисунок поверх аватарки
+  if (window.LumenFrames?.IDS.includes(st.fr)) {
+    av.classList.add('lm-frx-host');
+    av._frx = window.LumenFrames.attach(av, { id: st.fr, color: st.fc, size: w, light: document.documentElement.dataset.theme === 'light' });
+    return;
+  }
   av.classList.add('lm-fr', 'lm-fr-' + st.fr);
   av.style.setProperty('--frw', (w >= 90 ? 4 : w >= 56 ? 3 : w >= 36 ? 2.4 : 2) + 'px');
   setColors(av, st);

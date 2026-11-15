@@ -17,7 +17,8 @@
   const BADGES = ['diamond', 'bolt', 'crown', 'fire', 'star', 'heart', 'rocket', 'shield', 'clover', 'gem'];
   const RARE = ['early', 'top'];
   const MASCOTS = ['cat', 'dragon', 'ghost', 'slime'];
-  const FRAMES = ['own', 'fire', 'neon', 'snow', 'rainbow', 'gold'];
+  const FRAMES = ['own', 'fire', 'neon', 'snow', 'rainbow', 'gold',
+    'drip', 'venom', 'abyss', 'star', 'briar', 'hands', 'jester'];
   const SIG_BAD = /(https?|www\.|t\.me|@|telegram|телег|discord|\d{5,})/i;
   const HEX = /^[0-9a-f]{6}$/i;
   const num = (v, lo, hi, d) => { v = Number(v); return Number.isFinite(v) ? Math.min(hi, Math.max(lo, v)) : d; };
@@ -34,6 +35,7 @@
     if (PLATES.includes(s.pl)) out.pl = s.pl;
     if (MASCOTS.includes(s.ms)) out.ms = s.ms;
     if (FRAMES.includes(s.fr)) out.fr = s.fr;
+    if (out.fr && typeof s.fc === 'string' && HEX.test(s.fc)) out.fc = s.fc.toLowerCase();   // цвет тёмных рамок
     const bd = Array.isArray(s.bd) ? s.bd.filter(b => BADGES.includes(b)).slice(0, 3) : [];
     const rb = Array.isArray(s.rb) ? s.rb.filter(b => RARE.includes(b)).slice(0, 2) : [];
     if (bd.length || rb.length) out.bd = [...new Set([...rb, ...bd])];

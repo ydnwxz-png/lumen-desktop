@@ -5,7 +5,7 @@ import { S, bus } from '../core/state.js';
 import { notify } from './notify.js';
 import { accountsList, clientFor, forget } from './accounts.js';
 
-const EVERY = 45e3;
+const EVERY = 20e3;  // фоновые аккаунты: проверяем чаще, чтобы уведы не опаздывали
 const known = new Map(); // accId → Map(chatId → nodeMsg)
 let timer = null;
 let busy = false;
@@ -63,14 +63,14 @@ async function checkAccount(a) {
   const chats = await client.chats();
   const prevMap = known.get(a.id);
   const map = new Map();
-  let checks = 0; // не больше 5 проверок истории за проход — чтобы FunPay не ругался на частые запросы
+  let checks = 0; // не больше 12 проверок истории за проход — чтобы FunPay не ругался на частые запросы
   for (const c of chats) {
     map.set(c.id, c.nodeMsg);
     if (!prevMap) continue; // первый проход — только запоминаем
     const prev = prevMap.get(c.id);
     if (prev !== undefined && c.nodeMsg <= prev) continue;
     if (!c.unread) {
-      if (checks++ >= 5) {
+      if (checks++ >= 12) {
         if (prev !== undefined) map.set(c.id, prev); // проверим в следующий проход
         continue;
       }
