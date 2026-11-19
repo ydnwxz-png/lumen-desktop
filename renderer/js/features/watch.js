@@ -6,13 +6,21 @@ import { notify } from './notify.js';
 import { accountsList, clientFor, forget } from './accounts.js';
 
 const EVERY = 20e3;  // фоновые аккаунты: проверяем чаще, чтобы уведы не опаздывали
-const known = new Map(); // accId → Map(chatId → nodeMsg)
+const known = new Map(); // accId → { at, map: Map(chatId → nodeMsg) }
+const STALE = 10 * 60e3; // память старше 10 мин (сон компа, нет сети) — не верим, запоминаем заново
+const PACK = 3;          // больше 3 уведомлений за раз с одного аккаунта — одно общее
 let timer = null;
+let lastActive = null;
 let busy = false;
 let pending = null; // { accId, node } — открыть после переключения
 
 export function initWatch() {
   bus.on('me', () => {
+    // активный аккаунт опрашивает poller.js. Сменили аккаунт — память о нём и о прошлом активном устарела:
+    // без этого после переключения всё, что пришло за это время, сыпалось пачкой уведомлений
+    known.delete(S.accId);
+    if (lastActive && lastActive !== S.accId) known.delete(lastActive);
+    lastActive = S.accId;
     // после переключения аккаунта из уведомления — открыть нужный чат
     if (pending && pending.accId === S.accId) {
       const node = pending.node;
@@ -61,8 +69,10 @@ async function tick() {
 async function checkAccount(a) {
   const { client, me } = await clientFor(a.id);
   const chats = await client.chats();
-  const prevMap = known.get(a.id);
+  const k = known.get(a.id);
+  const prevMap = k && Date.now() - k.at < STALE ? k.map : null; // нет памяти или старая — первый проход
   const map = new Map();
+  const out = [];
   let checks = 0; // не больше 12 проверок истории за проход — чтобы FunPay не ругался на частые запросы
   for (const c of chats) {
     map.set(c.id, c.nodeMsg);
@@ -88,7 +98,26 @@ async function checkAccount(a) {
     }
     const isOrder = /оплатил заказ|paid for order/i.test(c.preview);
     const order = isOrder && S.settings.notify.orders;
-    const who = me?.username || a.username || 'другой аккаунт';
+    out.push({ c, order });
+  }
+  known.set(a.id, { at: Date.now(), map });
+  if (!out.length) return;
+  const who = me?.username || a.username || 'другой аккаунт';
+  if (out.length > PACK) {
+    // пачка — одно уведомление, а не десять подряд
+    const names = [...new Set(out.map((x) => x.c.name))];
+    const orders = out.filter((x) => x.order).length;
+    notify({
+      title: `📬 ${out.length} новых · ${who}`,
+      name: who,
+      body: (orders ? `💸 заказов: ${orders} · ` : '') + names.slice(0, 4).join(', ') + (names.length > 4 ? ` и ещё ${names.length - 4}` : ''),
+      node: accNode(a.id, out[0].c.id),
+      kind: orders ? 'order' : 'msg',
+      onClick: () => openOn(a.id, out[0].c.id),
+    });
+    return;
+  }
+  for (const { c, order } of out) {
     notify({
       title: (order ? `💸 Новый заказ от ${c.name}` : c.name) + ` · ${who}`,
       name: c.name,
@@ -99,5 +128,4 @@ async function checkAccount(a) {
       onClick: () => openOn(a.id, c.id),
     });
   }
-  known.set(a.id, map);
 }

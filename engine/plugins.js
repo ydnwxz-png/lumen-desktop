@@ -206,17 +206,21 @@ export class Plugins {
     this.saveConf();
   }
 
-  /** Установить плагин из кода. Новый плагин выключен, пока его не включат. */
+  /** Установить плагин из кода. Новый плагин выключен, пока его не включат.
+   *  Обновление уже включённого плагина (тот же файл или тот же id) — остаётся включённым. */
   async install(fileName, code) {
     if (!/\.(m?js|cjs)$/.test(fileName)) throw new Error('Нужен файл .js');
     if (Buffer.byteLength(code) > 2 * 1024 * 1024) throw new Error('Файл больше 2 МБ');
     fs.mkdirSync(this.dir, { recursive: true });
     const name = path.basename(fileName).replace(/[^\w.\-]+/g, '_');
     const old = [...this.list.values()].find((p) => p.file === name);
-    if (old && this.enabled(old.id)) await this.setEnabled(old.id, false);
+    const wasOn = !!(old && this.enabled(old.id));
+    if (wasOn) await this.setEnabled(old.id, false);
+    if (old?.store?.timer) old.store.flush();   // данные старой версии — на диск, чтобы новая их увидела
     fs.writeFileSync(path.join(this.dir, name), code);
     const entry = await this.load(name);
     if (old && old.id !== entry.id) this.list.delete(old.id);
+    if (!entry.error && wasOn) await this.setEnabled(entry.id, true);
     return entry;
   }
 
