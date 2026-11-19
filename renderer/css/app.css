@@ -328,6 +328,7 @@ html[data-idle] *, html[data-idle] *::before, html[data-idle] *::after { animati
 .lot-chip:hover { background: var(--press); color: var(--text); }
 .msgs { flex: 1; overflow-y: auto; overflow-x: hidden; padding: 18px 22px 10px; display: flex; flex-direction: column; min-height: 0; scroll-behavior: auto; }
 .msgs-inner { display: flex; flex-direction: column; gap: 2px; margin-top: auto; }
+.day.under { visibility: hidden; }
 .day { align-self: center; position: sticky; top: 0; z-index: 2; margin: 12px 0 8px; padding: 4px 12px; border-radius: 99px; font-size: 12px; font-weight: 600; color: var(--text-2); background: var(--surface-2); border: 1px solid var(--line); box-shadow: 0 4px 14px -6px rgba(0, 0, 0, .4); backdrop-filter: blur(10px); }
 .grp { display: flex; gap: 10px; align-items: flex-end; margin-top: 10px; max-width: 78%; }
 .grp.mine { align-self: flex-end; flex-direction: row-reverse; }

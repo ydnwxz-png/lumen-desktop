@@ -381,6 +381,16 @@ function nick(w) {
   const has = fxHas(S.me?.userId);
   head(w, 'Редактор ника', has ? 'У тебя есть украшение Lumen FX. Сделай новый стиль, получи ключ и отправь боту — стиль сменится сразу.' : 'Собери стиль, получи ключ и отправь его боту. Украшение увидят все, у кого стоит Lumen — в браузере и в этой программе.');
   const q = S.me?.username && /^[A-Za-z0-9_\-.]{3,24}$/.test(S.me.username) ? '?n=' + encodeURIComponent(S.me.username) : '';
+  if (!has) {
+    // покупка — на сайте в обычном браузере: там все способы оплаты, аккаунт FunPay подставляется сам
+    const open = (u) => (window.api ? window.api.app.open(u) : window.open(u));
+    const id = S.me?.userId ? '&fp=' + encodeURIComponent(S.me.userId) : '';
+    const bar = el(`<div class="row" style="gap:10px;margin:0 0 14px"><button class="btn primary">💎 Купить украшение навсегда</button><button class="btn">🧪 Попробовать бесплатно</button></div>`);
+    const [buy, trial] = bar.querySelectorAll('button');
+    buy.onclick = () => open('https://lumenfp.online/buy?p=nick' + id);
+    trial.onclick = () => open('https://t.me/Lumenfx_bot?start=trial');
+    w.append(bar);
+  }
   const box = el(`<div class="nick-editor"><iframe src="editor/editor.html${q}" title="Редактор ника"></iframe></div>`);
   w.append(box);
 }

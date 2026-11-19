@@ -359,6 +359,7 @@ function buildChat() {
   fab.onclick = () => scrollBottom(true);
   innerEl.addEventListener('load', () => V.stick && (msgsEl.scrollTop = msgsEl.scrollHeight), true);
   msgsEl.addEventListener('scroll', () => {
+    stuckDays();
     const near = atBottom();
     V.stick = near;
     fab.classList.toggle('show', !near);
@@ -369,6 +370,25 @@ function buildChat() {
     if (msgsEl.scrollTop < 80) loadMore();
   });
   innerEl.addEventListener('click', onMsgClick);
+}
+
+// плашки дат «липкие»: все прошедшие встают в одно место и стопкой торчат друг из-под друга («Сегодня» поверх «15 ноября»).
+// Оставляем видимой только последнюю прилипшую.
+let stuckRaf = 0;
+function stuckDays() {
+  if (stuckRaf) return;
+  stuckRaf = requestAnimationFrame(() => {
+    stuckRaf = 0;
+    if (!msgsEl || !innerEl) return;
+    // все прилипшие плашки стоят на одной высоте — у самой верхней; прячем все, кроме последней из них
+    const days = [...innerEl.querySelectorAll('.day')];
+    days.forEach((d) => d.classList.remove('under'));
+    if (days.length < 2) return;
+    const tops = days.map((d) => d.getBoundingClientRect().top);
+    const min = Math.min(...tops);
+    const stuck = days.filter((d, i) => tops[i] - min < 1.5);
+    stuck.slice(0, -1).forEach((d) => d.classList.add('under'));
+  });
 }
 
 function lastOrderId() {
@@ -516,6 +536,7 @@ function setMessages(list) {
   innerEl.innerHTML = '';
   appendDom(V.msgs, false);
   renderHead();
+  stuckDays();
 }
 
 function appendDom(list, anim) {
