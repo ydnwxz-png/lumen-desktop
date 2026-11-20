@@ -46,14 +46,14 @@ export function mountLots(c) {
 }
 
 export function showLots() {
-  if (!V.loaded) load();
+  if (!V.loaded || Date.now() - (V.at || 0) > 60e3) load();   // лоты могли купить или поменять на сайте
   clearInterval(tick);
   tick = setInterval(() => root.closest('.view.on') && (renderAuto(), renderRaiseStates()), 1000);
 }
 
 async function load() {
   const my = ++V.gen;
-  $('[data-list]', root).innerHTML = Array.from({ length: 3 }, () => `<div class="card cat"><div class="cat-head"><div class="skel" style="width:38px;height:38px;border-radius:12px"></div><div class="skel" style="height:14px;width:200px"></div></div>${'<div class="tr"><div class="skel" style="height:12px;width:60%"></div></div>'.repeat(2)}</div>`).join('');
+  if (!V.loaded) $('[data-list]', root).innerHTML = Array.from({ length: 3 }, () => `<div class="card cat"><div class="cat-head"><div class="skel" style="width:38px;height:38px;border-radius:12px"></div><div class="skel" style="height:14px;width:200px"></div></div>${'<div class="tr"><div class="skel" style="height:12px;width:60%"></div></div>'.repeat(2)}</div>`).join('');
   renderAuto();
   try {
     const cats = await S.backend.myLots();
@@ -67,6 +67,7 @@ async function load() {
         }
     V.cats = cats;
     V.loaded = true;
+    V.at = Date.now();
     render();
   } catch (e) {
     if (my !== V.gen) return;

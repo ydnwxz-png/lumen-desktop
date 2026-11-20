@@ -27,14 +27,15 @@ export function mountFinance(c) {
 }
 
 export function showFinance() {
-  if (!V.loaded) load();
+  // данные старше минуты — подтягиваем заново (баланс и операции могли измениться)
+  if (!V.loaded || Date.now() - (V.at || 0) > 60e3) load();
   else renderStats();
 }
 
 async function load(more = false) {
   const my = ++V.gen;
   if (!more) {
-    $('[data-list]', root).innerHTML = Array.from({ length: 6 }, () => `<div class="tr"><div class="skel" style="width:36px;height:36px;border-radius:11px"></div><div class="skel" style="height:12px;width:60%"></div><div></div><div></div><div></div></div>`).join('');
+    if (!V.loaded) $('[data-list]', root).innerHTML = Array.from({ length: 6 }, () => `<div class="tr"><div class="skel" style="width:36px;height:36px;border-radius:11px"></div><div class="skel" style="height:12px;width:60%"></div><div></div><div></div><div></div></div>`).join('');
     renderStats();
   }
   try {
@@ -44,6 +45,7 @@ async function load(more = false) {
     V.items = more ? [...V.items, ...r.items] : r.items;
     V.next = r.next;
     V.loaded = true;
+    if (!more) V.at = Date.now();
     render();
   } catch (e) {
     if (my !== V.gen) return;

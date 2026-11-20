@@ -73,6 +73,7 @@ export function mountStatsView(c) {
 
 export function showStatsView() {
   if (!V.items) load();
+  else if (Date.now() - (V.at || 0) > 5 * 60e3) load();   // старые цифры видны, свежие подгружаются поверх
 }
 
 async function load(force = false) {
@@ -95,6 +96,7 @@ async function load(force = false) {
     const raw = await loadSales(need, { force, pages: V.period === '0' ? 80 : 60, progress: (n) => my === V.gen && $('[data-note]', body) && ($('[data-note]', body).innerHTML = msg(n)) });
     if (my !== V.gen) return;
     V.items = withTs(raw);
+    V.at = Date.now();
     V.partial = !!raw.partial;
     done();
     render();

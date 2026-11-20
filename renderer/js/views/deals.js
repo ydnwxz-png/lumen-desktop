@@ -50,8 +50,34 @@ export function mountDeals(c) {
 }
 
 export function showDeals() {
+  // раньше список грузился один раз и дальше показывался из памяти — новые сделки появлялись только по «Обновить»
   if (!V.loaded) load();
+  else if (Date.now() - (V.at || 0) > 15e3) refresh();
 }
+
+// тихо подтянуть первую страницу: новые сделки — наверх, у старых обновить статус. Без мигания и без сброса «Ещё»
+async function refresh() {
+  if (V.loading || !V.loaded) return;
+  const my = V.gen;
+  V.at = Date.now();
+  try {
+    const r = await S.backend.trades(V.kind, V.state, '');
+    if (my !== V.gen || V.loading) return;
+    const fresh = new Map(r.items.map((o) => [o.id, o]));
+    const old = V.items.map((o) => fresh.get(o.id) || o);
+    const ids = new Set(old.map((o) => o.id));
+    const add = r.items.filter((o) => !ids.has(o.id));
+    const changed = add.length || old.some((o, i) => o !== V.items[i] && JSON.stringify(o) !== JSON.stringify(V.items[i]));
+    if (!changed) return;
+    V.items = [...add, ...old];
+    render();
+  } catch (e) { /* нет сети — покажем, что есть, попробуем в следующий раз */ }
+}
+
+// пока открыты «Сделки» — обновляем раз в минуту; вернулся интернет или окно — сразу
+setInterval(() => { if (S.view === 'deals' && !document.hidden) refresh(); }, 60e3);
+window.addEventListener('online', () => { if (S.view !== 'deals') return; V.loaded ? refresh() : load(); });
+document.addEventListener('visibilitychange', () => { if (!document.hidden && S.view === 'deals' && Date.now() - (V.at || 0) > 15e3) V.loaded ? refresh() : load(); });
 
 async function load(more = false) {
   const my = ++V.gen;
@@ -68,6 +94,7 @@ async function load(more = false) {
     V.items = more ? [...V.items, ...r.items] : r.items;
     V.next = r.next;
     V.loaded = true;
+    if (!more) V.at = Date.now();
     render(more);
   } catch (e) {
     if (my !== V.gen) return;

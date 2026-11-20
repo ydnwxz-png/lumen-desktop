@@ -14,6 +14,7 @@ export function createAccount(transport, { accId = '' } = {}) {
     return ctxs.get(node);
   };
   let me = null;
+  let lastBm = null; // { tag, list } — последний разобранный список чатов окна
 
   const get = (url, xhr = false) => api.fp.req(accId, { url, xhr });
   const post = (url, form, csrf = true) => api.fp.req(accId, { method: 'POST', url, form, xhr: true, csrf });
@@ -69,11 +70,21 @@ export function createAccount(transport, { accId = '' } = {}) {
       const v = await runner(objs);
       let chats = null,
         messages = null;
+      let same = false;
       for (const o of v.objects || []) {
-        if (o.type === 'chat_bookmarks' && o.data?.html != null) chats = P.parseBookmarks(o.data.html);
+        if (o.type === 'chat_bookmarks' && o.data?.html != null) {
+          // список не менялся (тот же тег) — не разбираем страницу заново и не перерисовываем
+          if (lastBm && o.tag && o.tag !== '00000000' && o.tag === lastBm.tag) {
+            chats = lastBm.list;
+            same = true;
+          } else {
+            chats = P.parseBookmarks(o.data.html);
+            lastBm = { tag: o.tag, list: chats };
+          }
+        }
         if (o.type === 'chat_node' && o.data?.messages) messages = P.parseMessagesJson(o.data.messages, ctx(openNode)).filter((m) => m.id > (lastId || 0));
       }
-      return { chats, messages };
+      return { chats, messages, same };
     },
     async openChat(node) {
       const r = await get(`/chat/?node=${encodeURIComponent(node)}`);

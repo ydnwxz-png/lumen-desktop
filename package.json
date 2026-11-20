@@ -1,7 +1,7 @@
 {
   "name": "lumen-desktop",
   "productName": "Lumen",
-  "version": "1.9.11",
+  "version": "1.9.14",
   "description": "Lumen — красивый десктопный клиент FunPay: чаты, сделки, лоты, шаблоны",
   "main": "main/main.js",
   "author": "Lumen",
@@ -10,7 +10,7 @@
     "start": "electron .",
     "dist:win": "electron-builder --win",
     "dist:mac": "electron-builder --mac",
-    "test": "node test/fp.test.js && node test/engine.test.mjs && node test/parse.node.test.mjs && node test/client.node.test.mjs"
+    "test": "node test/fp.test.js && node test/share.test.js && node test/engine.test.mjs && node test/parse.node.test.mjs && node test/client.node.test.mjs"
   },
   "devDependencies": {
     "electron": "^37.2.0",

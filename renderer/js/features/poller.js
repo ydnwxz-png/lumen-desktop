@@ -92,7 +92,8 @@ async function loop() {
     const { node, lastId } = provider();
     const r = await S.backend.poll(node, lastId);
     if (my !== gen) return;
-    if (r.chats) handleChats(r.chats);
+    // список не изменился — разбирать и перерисовывать нечего (первый опрос после старта — всегда)
+    if (r.chats && !(r.same && !first)) handleChats(r.chats);
     if (r.messages?.length && node) bus.emit('messages', node, r.messages);
     status('ok');
   } catch (e) {
