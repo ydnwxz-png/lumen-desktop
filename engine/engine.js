@@ -106,6 +106,7 @@ export class Engine extends EventEmitter {
     }
     this.startedAt = Date.now();
     this.first = true;
+    this.backlog = new Map();
     await this.plugins.loadAll();
     await this.plugins.call('onStart', {});
     this.log('info', `Автоматика запущена: ${this.me.username}`);
@@ -148,6 +149,7 @@ export class Engine extends EventEmitter {
   async tick() {
     const r = await this.acc.pollTags(this.tags);
     if (r.chats) await this.onChats(r.chats);
+    else if (this.backlog?.size) await this.drain(); // чаты, до которых не дошли в прошлый раз
     if (r.counters) await this.onCounters();
     this.first = false;
   }
@@ -157,9 +159,14 @@ export class Engine extends EventEmitter {
   async onChats(list) {
     const changed = [];
     const greeted = this.state.data.greeted;
+    // самый новый id сообщения, который мы уже видели (id у FunPay общие и растут). Новый чат: берём всё, что новее.
+    // Раньше брали «прочитано до» (data-user-msg) — а если другой бот (Cardinal) сразу ответил, чат становился
+    // прочитанным, и первое сообщение покупателя терялось: плагины и автоответы его не видели.
+    const hiPrev = this.hi || 0;
     for (const c of list) {
       const prev = this.known.get(c.id);
       this.known.set(c.id, c.nodeMsg);
+      if (c.nodeMsg > (this.hi || 0)) this.hi = c.nodeMsg;
       if (this.first) {
         this.lastIds.set(c.id, c.nodeMsg);
         if (!greeted[c.id]) greeted[c.id] = 1; // старые чаты не приветствуем
@@ -169,16 +176,32 @@ export class Engine extends EventEmitter {
       changed.push({ c, prev });
     }
     if (this.first) this.state.save();
-    for (const { c, prev } of changed.slice(0, 20)) {
+    // за раз — не больше 20 чатов (бережём FunPay), остальные — в очередь на следующий опрос.
+    // Раньше всё сверх 20 терялось: после сна компа часть покупателей оставалась без автоответа.
+    this.backlog ||= new Map();
+    for (const x of changed) {
+      const old = this.backlog.get(x.c.id);
+      this.backlog.set(x.c.id, old ? { c: x.c, prev: old.prev, hiPrev: old.hiPrev } : { ...x, hiPrev });
+    }
+    await this.drain();
+  }
+
+  async drain() {
+    const batch = [...this.backlog.values()].slice(0, 20);
+    for (const x of batch) this.backlog.delete(x.c.id);
+    for (const x of batch) {
+      const { c, prev, hiPrev } = x;
       let msgs;
       try {
         msgs = (await this.acc.lastMessages(c.id)).sort((a, b) => a.id - b.id);
       } catch (e) {
-        this.log('warn', `Чат ${c.name}: ${e.message}`);
+        // не загрузилось (429, сеть) — попробуем ещё раз на следующем опросе, а не потеряем сообщение
+        if ((x.tries || 0) < 5 && !this.backlog.has(c.id)) this.backlog.set(c.id, { ...x, tries: (x.tries || 0) + 1 });
+        else this.log('warn', `Чат ${c.name}: ${e.message}`);
         continue;
       }
       const seen = this.lastIds.get(c.id);
-      const from = seen ?? prev ?? c.userMsg ?? 0;
+      const from = seen ?? prev ?? (hiPrev || c.userMsg || 0);
       let fresh = msgs.filter((m) => m.id > from);
       if (seen === undefined) fresh = fresh.slice(-3);
       if (msgs.length) this.lastIds.set(c.id, Math.max(from, msgs[msgs.length - 1].id));

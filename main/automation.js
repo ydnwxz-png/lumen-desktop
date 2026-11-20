@@ -54,7 +54,12 @@ async function attach(accId, session, mode) {
         continue;
       }
       if (!accCache.has(a.id)) accCache.set(a.id, await accountFromSession(a.session));
-      out.push({ id: a.id, userId: a.userId, username: a.username, active: false, account: accCache.get(a.id) });
+      const other = accCache.get(a.id);
+      // без входа у аккаунта нет «я» (userId), и chats()/send() падали — плагины не видели
+      // сообщения других аккаунтов, пока какой-нибудь другой плагин не вызовет auth сам.
+      // Сессия общая с окном: обычно вход уже есть и запроса не будет.
+      if (!other.me()) await other.auth(false).catch(() => {});
+      out.push({ id: a.id, userId: a.userId, username: a.username, active: false, account: other });
     }
     return out;
   };

@@ -32,12 +32,22 @@ const sessions = new Map();
 
 // ---------------------------------------------------------------- FunPay-сессии
 
+// Сколько живёт общая копия списка чатов: у открытого аккаунта — 2,5 с (окно опрашивает раз в 3 с),
+// у остальных — 5 с (их проверяют раз в 6 с уведомления; плагины берут ту же копию без запроса).
+const FRESH_ACTIVE = 2500;
+const FRESH_OTHER = 5000;
+function applyFresh() {
+  const active = store.active();
+  for (const [id, s] of sessions) s.fresh = id === active ? FRESH_ACTIVE : FRESH_OTHER;
+}
+
 function sessionFor(id) {
   if (sessions.has(id)) return sessions.get(id);
   const acc = store.account(id);
   if (!acc) throw new Error('Аккаунт не найден');
   const s = new Session({ gk: store.gk(acc), cookies: acc.cookies, ua: acc.ua }, { onCookies: (cookies) => store.patchAccount(id, { cookies }) });
   sessions.set(id, s);
+  applyFresh();
   return s;
 }
 
@@ -79,7 +89,11 @@ handle('acc:remove', async (id) => {
   session.fromPartition('persist:fp-' + id).clearStorageData().catch(() => {});
   return true;
 });
-handle('acc:active', (id) => store.setActive(id));
+handle('acc:active', (id) => {
+  const r = store.setActive(id);
+  applyFresh();
+  return r;
+});
 handle('acc:key', (id) => store.gk(store.account(id)));
 
 handle('fp:auth', async (id, force) => {
