@@ -280,8 +280,12 @@ input[type=range]:focus-visible{outline:2px solid var(--acc);outline-offset:3px}
 @keyframes fade{from{opacity:0}}
 
 /* ---------- узкий экран: сцена сверху, ящик снизу, вкладки строкой ---------- */
+/* внутри Lumen Desktop: заголовок уже есть у программы — без своей шапки, на всю высоту окна */
+.in-app .bar{display:none}
+.in-app .app{grid-template-rows:minmax(0,1fr);max-width:1500px;padding:10px;min-height:540px}
 @media (max-width:900px){
   .app{grid-template-columns:minmax(0,1fr);grid-template-rows:auto auto 600px;height:auto;min-height:0}
+  .in-app .app{grid-template-rows:auto 600px}
   .stage{min-height:330px}
   .deck{grid-template-columns:minmax(0,1fr);grid-template-rows:auto minmax(0,1fr) auto auto auto}
   .tabs{grid-row:auto;flex-direction:row;border-right:0;border-bottom:1px solid var(--line);padding:6px}
@@ -475,6 +479,7 @@ html .tc-item.lm-lh.lm-lh-pixel.lm-lh-pixel .tc-price, html .tc-item.lm-lh.lm-lh
 </style>
 </head>
 <body>
+<script>if(window.parent!==window)document.documentElement.classList.add('in-app')</script>
 <!-- шаг 1: ник -->
 <div class="boot" id="boot">
   <form id="step1" autocomplete="off">
