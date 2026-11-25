@@ -18,5 +18,6 @@ rm -rf dist
 CSC_IDENTITY_AUTO_DISCOVERY=false npx electron-builder --mac --publish never || { echo "Сборка не удалась — скинь скрин этого окна"; exit 1; }
 echo ""
 echo "Готово! Файлы для загрузки в релиз открыты в Finder (папка dist):"
-ls dist/*.dmg dist/*.blockmap dist/latest-mac.yml 2>/dev/null
+ls dist/*.dmg dist/Lumen-*.zip dist/*.blockmap dist/latest-mac.yml 2>/dev/null
+echo "Загрузи в релиз и .dmg, и .zip — по .zip Lumen на Mac обновляется сам."
 open dist

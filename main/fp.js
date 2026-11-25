@@ -23,6 +23,8 @@ const COOL = [2000, 4000, 8000, 15000, 20000]; // пауза после 429, р�
 // FunPay ограничивает частоту по IP, а все аккаунты программы ходят с одного IP — пауза общая на все сессии
 const LIMIT = { until: 0, level: 0 };
 const HIST_TTL = 30e3;
+// запросы, которые ждёт человек: открыть чат, отправить форму/картинку, открыть заказ
+const isUserReq = (o) => !!o && (!!o.file || (o.method && o.method !== 'GET') || /^\/chat\/\?node=|^\/orders\/[A-Za-z0-9]+\/?$/.test(String(o.url || '')));
 const isHistory = (o) => o && (!o.method || o.method === 'GET') && !o.form && !o.file && /^\/chat\/history\?/.test(String(o.url || ''));
 const FUNPAY_HOST = /^([a-z0-9-]+\.)*funpay\.com$/i;
 const SUPPORT = 'https://support.funpay.com';
@@ -142,7 +144,11 @@ class Session {
     this.base = opts.base || BASE;
     this.supportBase = opts.support || SUPPORT;
     this.sjar = new Map(); // куки support.funpay.com — отдельно, чтобы их PHPSESSID не затёр сессию funpay.com
-    this.queue = Promise.resolve();
+    // две очереди: то, что ждёт человек (открыть чат, отправить), идёт раньше фоновых проверок
+    this.qHi = [];
+    this.qLo = [];
+    this.busy = false;
+    this.curHi = false;
     // общий кэш опроса (см. SHARED)
     this.fresh = opts.fresh || 2500; // сколько мс копия списка чатов считается свежей
     this.snap = new Map(); // 'type:id' → { type, id, tag, data, at }
@@ -158,10 +164,29 @@ class Session {
   }
 
   // Все публичные вызовы идут по очереди: куки и csrf не перемешиваются.
-  lock(fn) {
-    const p = this.queue.then(fn, fn);
-    this.queue = p.catch(() => {});
-    return p;
+  /** По одному запросу за раз. hi — действия человека: обгоняют фоновые опросы, плагины, проверки. */
+  lock(fn, hi = false) {
+    return new Promise((resolve, reject) => {
+      (hi ? this.qHi : this.qLo).push({ fn, resolve, reject, hi });
+      this.pump();
+    });
+  }
+
+  async pump() {
+    if (this.busy) return;
+    const job = this.qHi.shift() || this.qLo.shift();
+    if (!job) return;
+    this.busy = true;
+    this.curHi = job.hi;
+    try {
+      job.resolve(await job.fn());
+    } catch (e) {
+      job.reject(e);
+    } finally {
+      this.busy = false;
+      this.curHi = false;
+      this.pump();
+    }
   }
 
   url(u) {
@@ -267,7 +292,9 @@ class Session {
 
   /** Не чаще раза в this.gap мс и не раньше, чем кончится пауза после 429. */
   async pace() {
-    const wait = Math.max(this.lastAt + this.gap - Date.now(), LIMIT.until - Date.now(), 0);
+    // действие человека не висит минутами из-за паузы после 429: ждём максимум 3 с
+    const cool = Math.min(LIMIT.until - Date.now(), this.curHi ? 3000 : Infinity);
+    const wait = Math.max(this.lastAt + this.gap - Date.now(), cool, 0);
     if (wait > 0) await sleep(wait);
     this.lastAt = Date.now();
   }
@@ -391,7 +418,7 @@ class Session {
     let r = await this.once(method, url, this.buildBody({ form, csrf, file }), xhr, false);
     // 429: FunPay запрос не выполнил — ждём паузу (её выставил onStatus) и повторяем, а не теряем сообщение или ответ.
     // Повтор безопасен: отклонённый запрос FunPay не обработал, дубля не будет.
-    for (let i = 0; i < 3 && r.status === 429; i++) r = await this.once(method, url, this.buildBody({ form, csrf, file }), xhr, false);
+    for (let i = 0; i < (this.curHi ? 1 : 3) && r.status === 429; i++) r = await this.once(method, url, this.buildBody({ form, csrf, file }), xhr, false);
     if (r.status === 428) {
       await this.refreshSeal();
       r = await this.once(method, url, this.buildBody({ form, csrf, file }), xhr, false);
@@ -533,14 +560,14 @@ class Session {
   }
 
   supportTicket(p) {
-    return this.lock(() => this._supportTicket(p));
+    return this.lock(() => this._supportTicket(p), true);
   }
 
   auth(force = false) {
-    return this.lock(() => this._auth(force));
+    return this.lock(() => this._auth(force), true);
   }
   request(opts) {
-    if (!isHistory(opts)) return this.lock(() => this._request(opts));
+    if (!isHistory(opts)) return this.lock(() => this._request(opts), isUserReq(opts));
     // История чата: одинаковые запросы (окно, автоматика, плагины) — один поход в FunPay.
     // Кэш живёт, пока список чатов не изменился: новое сообщение → новый запрос.
     const key = opts.url;
@@ -550,13 +577,15 @@ class Session {
     const fk = key + '#' + seq;
     const flying = this.histFlight.get(fk);
     if (flying) return flying.then((r) => ({ ...r }));
+    // старые сообщения (листаешь чат вверх) — ждёт человек; последние — это фоновые проверки
+    const older = !/last_message=99999999999999/.test(key);
     const p = this.lock(async () => {
       const again = this.histGet(key, seq);
       if (again) return again;
       const r = await this._request(opts);
       if (r.status === 200) this.histPut(key, seq, r);
       return r;
-    });
+    }, older);
     this.histFlight.set(fk, p);
     p.then(
       () => this.histFlight.delete(fk),
@@ -585,7 +614,9 @@ class Session {
         if (Array.isArray(v) && v.length && v.every((o) => o && typeof o === 'object')) list = v;
       } catch {}
     }
-    if (!list || !list.some((o) => SHARED.has(o.type))) return this.lock(() => this._runner(typeof objects === 'string' ? objects : JSON.stringify(objects), request));
+    // отправка сообщения и открытый чат (chat_node) — вне очереди
+    const hi = !!request && request !== 'false' || !list || list.some((o) => o.type === 'chat_node');
+    if (!list || !list.some((o) => SHARED.has(o.type))) return this.lock(() => this._runner(typeof objects === 'string' ? objects : JSON.stringify(objects), request), hi);
     return this.poll(list);
   }
 
@@ -616,7 +647,7 @@ class Session {
         if (hit2) return hit2;
       }
     }
-    const p = this.lock(() => this._poll(list, onlyShared));
+    const p = this.lock(() => this._poll(list, onlyShared), list.some((o) => o.type === 'chat_node'));
     if (list.some((o) => o.type === 'chat_bookmarks')) {
       this.inflight = p;
       p.catch(() => {}).then(() => this.inflight === p && (this.inflight = null));

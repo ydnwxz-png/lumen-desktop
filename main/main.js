@@ -168,7 +168,7 @@ handle('fx:list', async () => {
   try {
     const ctl = new AbortController();
     const t = setTimeout(() => ctl.abort(), 15000);
-    const r = await fetch(FX_URL, { signal: ctl.signal, headers: { 'User-Agent': 'Lumen-Desktop' } });
+    const r = await fetch(FX_URL + (FX_URL.includes('?') ? '&' : '?') + 'i=' + lumenIid() + '&c=desk' + lumenPV(), { signal: ctl.signal, headers: { 'User-Agent': 'Lumen-Desktop' } });
     clearTimeout(t);
     if (!r.ok) throw new Error('HTTP ' + r.status);
     const text = await r.text();
@@ -190,6 +190,11 @@ function lumenIid() {
     store.set('lumenIid', iid);
   }
   return iid;
+}
+// для анонимной статистики: система (Windows / macOS) и версия программы — без ников и аккаунтов
+function lumenPV() {
+  const p = process.platform === 'darwin' ? 'mac' : process.platform === 'win32' ? 'win' : 'linux';
+  return '&p=' + p + '&v=' + encodeURIComponent(app.getVersion());
 }
 // «Клуб Lumen»: отметиться, что этот профиль FunPay сидит в Lumen Desktop (значок у ника), и получить список
 let clubCache = { at: 0, data: null };
@@ -219,7 +224,7 @@ handle('lumen:api', async (p, method, body) => {
   p = String(p || '');
   if (!/^\/api\/(chat(\/(login|me|send))?|online)(\?|$)/.test(p)) throw new Error('bad path');
   let url = LUMEN_API + p;
-  if (/^\/api\/(chat|online)(\?|$)/.test(p)) url += (p.includes('?') ? '&' : '?') + 'i=' + lumenIid() + '&c=desk';
+  if (/^\/api\/(chat|online)(\?|$)/.test(p)) url += (p.includes('?') ? '&' : '?') + 'i=' + lumenIid() + '&c=desk' + lumenPV();
   const post = method === 'POST';
   const ctl = new AbortController();
   const t = setTimeout(() => ctl.abort(), 15000);
@@ -430,7 +435,7 @@ function createWindow() {
   });
   win.loadFile(path.join(ROOT, 'renderer', 'index.html'));
   win.once('ready-to-show', () => {
-    if (!hidden) win.show();
+    if (!hidden) showFull();
   });
   win.on('close', (e) => {
     if (!quitting && settings().tray !== false && !isMac) {
@@ -476,15 +481,25 @@ function createWindow() {
   });
 }
 
+// Первый показ окна — сразу на весь экран (развёрнуто, не полноэкранный режим)
+function showFull() {
+  if (!win || win.isDestroyed()) return;
+  if (!win.__full) {
+    win.__full = true;
+    win.maximize();
+  }
+  win.show();
+}
+
 function showMain(node) {
   if (!win || win.isDestroyed()) {
     createWindow();
-    win.show();
+    showFull();
     if (node) win.webContents.once('did-finish-load', () => win && setTimeout(() => win.webContents.send('nav:chat', node), 1500));
     return;
   }
   if (win.isMinimized()) win.restore();
-  win.show();
+  showFull();
   win.focus();
   if (node) win.webContents.send('nav:chat', node);
 }

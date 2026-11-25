@@ -94,7 +94,7 @@ e.from, e.to      // (onOrderStatus) старый и новый статус
 await api.send(chatId, 'текст')                    // написать в чат
 await api.sendImage(chatId, buffer, 'img.png')     // отправить картинку
 api.fill('Привет, $username!', { username: 'bob' }) // подставить переменные
-api.notify('текст', { chat })                      // уведомление: всплывашка в приложении
+api.notify('текст', { chat })                      // уведомление: всплывашка в приложении; по клику откроется чат
 api.log('текст') / api.warn('текст')               // в журнал
 api.settings                                       // значения настроек
 api.storage.get('key', поУмолчанию)                // своё хранилище, переживает перезапуск
@@ -180,9 +180,10 @@ export default {
 | Функция | Что делает |
 |---|---|
 | `lumen.me()` | `{ userId, username, balance }` |
-| `lumen.chats()` | Список чатов `[{ id, name, preview, unread, time }]` |
+| `lumen.chats()` | Список чатов `[{ id, name, preview, unread, time, avatar, msg }]` (msg — id последнего сообщения) |
 | `lumen.openChat()` | Открытый сейчас чат `{ id, name }` или `null` |
 | `lumen.send(chatId, text)` | Отправить сообщение |
+| `lumen.goChat(chatId)` | Открыть чат в программе (вкладка «Чаты») |
 | `lumen.toast(title, body, kind)` | Всплывашка; `kind`: `'ok'` / `'err'` / `''` |
 | `lumen.confirm(title, text, yes)` | Окно «Да / Отмена» → `true` / `false` |
 | `lumen.copy(text)` | Скопировать в буфер |
