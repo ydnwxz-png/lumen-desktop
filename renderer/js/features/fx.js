@@ -16,6 +16,16 @@ const live = new Set();
 const MAX_LIVE = 40;
 
 export const fxHas = (uid) => !!map[String(uid)];
+/** Ключ LMN-… с текущим стилем — редактор ника откроется сразу с ним */
+export function fxKey(uid, nick) {
+  const st = map[String(uid)];
+  if (!st) return '';
+  const d = { v: 1, n: nick || '', c: st.c.map((x) => String(x).replace('#', '')), f: st.f, t: st.t, p: st.p, z: st.z, s: st.s, k: st.k };
+  ['pl', 'ms', 'fr', 'fc', 'sg', 'ls', 'fo'].forEach((k) => { if (st[k]) d[k] = st[k]; });
+  if (st.bd && st.bd.length) d.bd = st.bd;
+  if (st.lh) d.lh = 1;
+  try { return 'LMN-' + btoa(unescape(encodeURIComponent(JSON.stringify(d)))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, ''); } catch { return ''; }
+}
 export const fxCount = () => Object.keys(map).length;
 
 // ---------------------------------------------------------------- загрузка списка

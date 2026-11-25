@@ -6,7 +6,7 @@ import { S, bus, saveSettings, saveTemplates, DEFAULT_SETTINGS } from '../core/s
 import { seg, switchEl, confirmBox, promptBox, modal, ok, err, toast, busy } from '../ui/kit.js';
 import { themePreview, applyTheme, currentTheme, cleanTheme, myThemes, saveMyTheme, deleteMyTheme, downloadTheme, setBackground } from '../features/themes.js';
 import { NICK_STYLES, nickHtml, myNick } from '../features/nicks.js';
-import { fxHas } from '../features/fx.js';
+import { fxHas, fxKey } from '../features/fx.js';
 import { VARS } from '../features/templates.js';
 import { sound, notify, SOUNDS } from '../features/notify.js';
 import { applyLook } from '../ui/look.js';
@@ -75,6 +75,7 @@ function show(sec) {
   root.querySelectorAll('[data-s]').forEach((b) => b.classList.toggle('on', b.dataset.s === sec));
   page.innerHTML = '';
   page.scrollTop = 0;
+  page.classList.toggle('nick-mode', sec === 'nick'); // редактор ника — на весь экран, без прокрутки
   const wrap = el('<div class="stagger"></div>');
   page.append(wrap);
   ({ look, ui, backup: backupSec, nick, chat, notify: notif, ai, acc, sys, about })[sec](wrap);
@@ -381,6 +382,9 @@ function nick(w) {
   const has = fxHas(S.me?.userId);
   head(w, 'Редактор ника', has ? 'У тебя есть украшение Lumen FX. Сделай новый стиль, получи ключ и отправь боту — стиль сменится сразу.' : 'Собери стиль, получи ключ и отправь его боту. Украшение увидят все, у кого стоит Lumen — в браузере и в этой программе.');
   const q = S.me?.username && /^[A-Za-z0-9_\-.]{3,24}$/.test(S.me.username) ? '?n=' + encodeURIComponent(S.me.username) : '';
+  // есть украшение — редактор сразу открывается с твоим текущим стилем (можно поменять что-то одно)
+  const myKey = has ? fxKey(S.me?.userId, S.me?.username) : '';
+  const qk = q + (myKey ? (q ? '&' : '?') + 'k=' + encodeURIComponent(myKey) : '');
   if (!has) {
     // покупка — на сайте в обычном браузере: там все способы оплаты, аккаунт FunPay подставляется сам
     const open = (u) => (window.api ? window.api.app.open(u) : window.open(u));
@@ -391,8 +395,9 @@ function nick(w) {
     trial.onclick = () => open('https://t.me/Lumenfx_bot?start=trial');
     w.append(bar);
   }
-  const box = el(`<div class="nick-editor"><iframe src="editor/editor.html${q}" title="Редактор ника"></iframe></div>`);
+  const box = el(`<div class="nick-editor"><iframe src="editor/editor.html${qk}" title="Редактор ника"></iframe></div>`);
   w.append(box);
+  // высоту задаёт CSS (.set-page.nick-mode): редактор занимает всё место до низа, страница не листается
 }
 
 // сообщения от редактора ника (iframe): скопировать ключ / отправить боту

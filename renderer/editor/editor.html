@@ -260,6 +260,18 @@ input[type=range]:focus-visible{outline:2px solid var(--acc);outline-offset:3px}
 .boot .save{width:100%;margin:6px 0 0}
 .boot .save:disabled{opacity:.35;cursor:default;transform:none;box-shadow:0 4px 0 var(--acc-d)}
 
+/* ---------- свой ключ ---------- */
+#loadview{grid-column:2;grid-row:1/4;padding:18px 16px 14px;overflow:auto;display:flex;flex-direction:column}
+#loadview h2{font-size:17px;margin:4px 2px 10px}
+.lv-hint{font-size:12.5px;color:var(--muted);margin:0 2px 12px;line-height:1.45}.lv-hint b{color:var(--text)}
+#lvIn,#bootKeyIn{width:100%;resize:none;border:0;border-radius:10px;background:#0b0c0e;box-shadow:inset 0 0 0 2px var(--line2);color:#d8d8de;font:500 12px/1.45 ui-monospace,Menlo,monospace;padding:12px 14px;outline:none}
+#lvIn:focus,#bootKeyIn:focus{box-shadow:inset 0 0 0 2px var(--acc)}
+#loadview .kv-btns{margin-top:8px}
+#loadview .foot{margin:12px 0 0}
+.ktoast{position:absolute;left:50%;bottom:86px;transform:translateX(-50%);z-index:20;padding:9px 14px;border-radius:10px;background:var(--acc);color:#0d0e10;font-size:12.5px;font-weight:700;white-space:nowrap;box-shadow:0 4px 0 var(--acc-d)}
+.bootkey{display:inline-block;margin-top:18px;font-size:13px;color:var(--muted);text-decoration:none;border-bottom:1px dashed var(--line2)}
+.bootkey:hover{color:var(--text)}
+.bootkeybox{margin-top:12px;text-align:left}
 /* ---------- ключ ---------- */
 #keyview{grid-column:2;grid-row:1/4;padding:18px 16px 14px;overflow:auto;display:flex;flex-direction:column}
 #keyview h2{font-size:17px;margin:4px 2px 14px}
@@ -291,8 +303,8 @@ input[type=range]:focus-visible{outline:2px solid var(--acc);outline-offset:3px}
   .tabs{grid-row:auto;flex-direction:row;border-right:0;border-bottom:1px solid var(--line);padding:6px}
   .tabs button{flex:1 0 64px;padding:8px 2px 6px}
   .tabs .ind{left:0;right:auto;top:6px;bottom:6px;height:auto}
-  .sliders,.save,.foot,#keyview{grid-column:1}
-  #keyview{grid-row:1/-1}
+  .sliders,.save,.foot,#keyview,#loadview{grid-column:1}
+  #keyview,#loadview{grid-row:1/-1}
 }
 @media (max-width:520px){
   .app{padding:8px;gap:8px}
@@ -489,6 +501,8 @@ html .tc-item.lm-lh.lm-lh-pixel.lm-lh-pixel .tc-price, html .tc-item.lm-lh.lm-lh
     <div class="s1-field"><span>@</span><input id="nickIn" maxlength="24" placeholder="NightSeller" spellcheck="false"></div>
     <div class="s1-err" id="nickErr"></div>
     <button class="save" type="submit"><span class="px">Начать</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>
+    <a href="#" class="bootkey" id="bootKey">У меня уже есть ключ — изменить свой стиль</a>
+    <div class="bootkeybox" id="bootKeyBox" hidden><textarea id="bootKeyIn" rows="3" placeholder="Вставь ключ LMN-… — стиль и ник загрузятся сами" spellcheck="false"></textarea><div class="s1-err" id="bootKeyErr"></div></div>
   </form>
 </div>
 
@@ -517,6 +531,7 @@ html .tc-item.lm-lh.lm-lh-pixel.lm-lh-pixel .tc-price, html .tc-item.lm-lh.lm-lh
     <div class="lots-cap"><span class="px">Так в списке лотов</span>
       <div class="stage-tools">
         <button class="chipbtn roll" id="rollBtn" title="Случайный стиль"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="3"/><circle cx="9" cy="9" r="1.2" fill="currentColor"/><circle cx="15" cy="15" r="1.2" fill="currentColor"/><circle cx="15" cy="9" r="1.2" fill="currentColor"/><circle cx="9" cy="15" r="1.2" fill="currentColor"/></svg>Случайно</button>
+        <button class="chipbtn" id="keyBtn" title="Вставить свой ключ и изменить стиль"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="15" r="4"/><path d="m10.8 12.2 8.7-8.7M17 6l2.5 2.5M14.5 8.5l2 2"/></svg>Мой ключ</button>
         <button class="chipbtn" id="resetBtn" title="Сбросить"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/></svg>Сброс</button>
       </div>
     </div>
@@ -591,6 +606,18 @@ html .tc-item.lm-lh.lm-lh-pixel.lm-lh-pixel .tc-price, html .tc-item.lm-lh.lm-lh
     <button class="save" id="save"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="15" r="4"/><path d="m10.8 12.2 8.7-8.7M17 6l2.5 2.5M14.5 8.5l2 2"/></svg><span class="px">Получить ключ</span></button>
     <div class="foot">Это превью. Чтобы применить — получи ключ и отправь боту.</div>
 
+    <div id="loadview" hidden>
+      <h2 class="px">Вставь свой ключ</h2>
+      <p class="lv-hint">Ключ — это твой стиль ника (начинается с <b>LMN-</b>). Найти его можно в боте: «Украсить ник» → твой ник → «🔑 Ключ моего стиля». Вставь — редактор загрузит стиль, и можно менять только то, что хочешь.</p>
+      <textarea id="lvIn" rows="5" placeholder="LMN-eyJ2IjoxLC..." spellcheck="false"></textarea>
+      <div class="sigerr" id="lvErr"></div>
+      <div class="kv-btns">
+        <button class="kv-ghost" id="lvBack"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M11 6l-6 6 6 6"/></svg>Назад</button>
+        <button class="kv-ghost" id="lvGo" style="background:var(--acc);color:#0d0e10;box-shadow:inset 0 -3px 0 var(--acc-d)">Загрузить стиль</button>
+      </div>
+      <div class="foot">Подсказка: можно просто нажать Ctrl+V (⌘V) в любом месте редактора — ключ загрузится сам.</div>
+    </div>
+    <div class="ktoast" id="kToast" hidden>✓ Стиль загружен из ключа — меняй что хочешь</div>
     <div id="keyview" hidden>
       <h2 class="px">Ключ готов</h2>
       <div class="kv-steps">
@@ -1560,6 +1587,7 @@ function tabPlace(i,instant){const b=tabBox(tabBtns[i]);if(instant)tabInd.style.
 const SLIDER_TABS=['style','text','parts'];
 function tabGo(i){
   if(!keyview.hidden)showKey(false);
+  if(!loadview.hidden)showLoad(false);
   const from=tabCur;if(i===from)return;tabCur=i;clearTimeout(tabT);
   const a=tabBox(tabBtns[from]),b=tabBox(tabBtns[i]),l=Math.min(a.p,b.p),r=Math.max(a.p+a.s,b.p+b.s);
   tabSet(l,r-l);                                   // растянулась на обе вкладки
@@ -1588,7 +1616,7 @@ function makeKey(){
   return 'LMN-'+b;
 }
 const keyview=document.getElementById('keyview'),kvKey=document.getElementById('kvKey');
-function showKey(on){['paneBox','save'].forEach(id=>document.getElementById(id).hidden=on);document.querySelector('.deck>.foot').hidden=on;
+function showKey(on){if(on)document.getElementById('loadview').hidden=true;['paneBox','save'].forEach(id=>document.getElementById(id).hidden=on);document.querySelector('.deck>.foot').hidden=on;
   document.getElementById('sliders').hidden=on||!SLIDER_TABS.includes(tabBtns[tabCur].dataset.t);
   keyview.hidden=!on;const el=on?keyview:document.getElementById('paneBox');el.classList.remove('fade');void el.offsetWidth;el.classList.add('fade');}
 document.getElementById('save').onclick=()=>{if(!sigChk()){tabGo(tabBtns.findIndex(b=>b.dataset.t==='prof'));sigIn.focus();return;}kvKey.textContent=makeKey();kvKey.classList.remove('ok');showKey(true);};
@@ -1615,23 +1643,51 @@ const crtOpts=()=>{const light=document.getElementById('preview').classList.cont
   return {color:light?'#3a3d44':'#8b93a7',light,speed:.5,idle:.35,columns:190,levels:4,waveFrequency:3.6,persistence:.55,curvature:.2,scanline:.55,lines:220,mask:'aperture',maskStrength:.2,
     bloom:light?.4:.9,noise:.05,flicker:0,interference:.08,vignette:.55,brightness:light?.5:.65,rgbShift:.0015,dpr:1};};
 function crtStart(){if(crt||!window.LumenCRT)return;try{crt=LumenCRT(document.getElementById('crt'),crtOpts());}catch(e){crt=null;}}
-// ?k=LMN-… — открыть сразу с текущим стилем (ссылка из бота)
-(function(){const k=new URLSearchParams(location.search).get('k');if(!k||!k.startsWith('LMN-'))return;
+/* Ключ → настройки редактора. Можно открыть ссылкой ?k=LMN-…, вставить ключ кнопкой «Мой ключ» или просто Ctrl+V.
+   Ключ полностью заменяет текущий стиль. Возвращает ник из ключа или '' (если ключ не подошёл — null). */
+function loadKey(k){
+  k=String(k||'').trim().replace(/\s+/g,'');if(!k.startsWith('LMN-'))return null;
   try{let b=k.slice(4).replace(/-/g,'+').replace(/_/g,'/');while(b.length%4)b+='=';
     const d=JSON.parse(decodeURIComponent(escape(atob(b))));const H=/^[0-9a-f]{6}$/i;
-    if(!Array.isArray(d.c)||d.c.length!==3||!d.c.every(x=>H.test(x)))return;
-    if(!FILLS.some(x=>x[0]===d.f)||!TEXTS.some(x=>x[0]===d.t)||!PARTS.some(x=>x[0]===d.p))return;
+    if(!Array.isArray(d.c)||d.c.length!==3||!d.c.every(x=>H.test(x)))return null;
+    if(!FILLS.some(x=>x[0]===d.f)||!TEXTS.some(x=>x[0]===d.t)||!PARTS.some(x=>x[0]===d.p))return null;
     const cl=(v,lo,hi,df)=>{v=+v;return isFinite(v)?Math.min(hi,Math.max(lo,v)):df;};
-    Object.assign(S,{c:d.c.map(x=>'#'+x.toLowerCase()),fill:d.f,text:d.t,part:d.p,sz:cl(d.z,.4,2,1),sp:cl(d.s,.3,2.5,1),cnt:Math.round(cl(d.k,4,60,22)),pr:''});
     const has=(l,v)=>l.some(x=>x[0]===v);
-    if(has(PLATES,d.pl))S.pl=d.pl;if(has(MASCOTS,d.ms))S.ms=d.ms;if(has(FRAMES,d.fr))S.fr=d.fr;if(typeof d.fc==='string'&&/^[0-9a-f]{6}$/i.test(d.fc))S.fc=d.fc.toLowerCase();
-    if(Array.isArray(d.bd))S.bd=d.bd.filter(b=>has(BADGES,b)).slice(0,3);
-    if(typeof d.sg==='string'){sigIn.value=d.sg.slice(0,28);sigChk();}
-    S.lh=d.lh?1:0;if(LOTS.some(x=>x[0]===d.ls))S.ls=d.ls;if(FONTS.some(x=>x[0]===d.fo))S.fo=d.fo;
+    Object.assign(S,{c:d.c.map(x=>'#'+x.toLowerCase()),fill:d.f,text:d.t,part:d.p,sz:cl(d.z,.4,2,1),sp:cl(d.s,.3,2.5,1),cnt:Math.round(cl(d.k,4,60,22)),pr:'',
+      pl:has(PLATES,d.pl)?d.pl:'none',ms:has(MASCOTS,d.ms)?d.ms:'none',fr:has(FRAMES,d.fr)?d.fr:'none',
+      fc:typeof d.fc==='string'&&H.test(d.fc)?d.fc.toLowerCase():LumenFrames.DEF_COLOR,
+      bd:Array.isArray(d.bd)?d.bd.filter(x=>has(BADGES,x)).slice(0,3):[],
+      lh:d.lh?1:0,ls:has(LOTS,d.ls)?d.ls:'classic',fo:has(FONTS,d.fo)?d.fo:'def'});
+    sigIn.value=typeof d.sg==='string'?d.sg.slice(0,28):'';sigChk();
     [['sz',v=>Math.round(v*100)+'%'],['sp',v=>(+v).toFixed(1)+'×'],['cnt',v=>v]].forEach(([id,f])=>{const el=document.getElementById(id);el.value=S[id];document.getElementById('o-'+id).textContent=f(S[id]);paintRange(el);});
     render();
-  }catch(e){}
-})();
+    return typeof d.n==='string'&&okNick(d.n)?d.n:'';
+  }catch(e){return null;}
+}
+const loadview=document.getElementById('loadview'),lvIn=document.getElementById('lvIn'),lvErr=document.getElementById('lvErr');
+function showLoad(on){['paneBox','save'].forEach(id=>document.getElementById(id).hidden=on);document.querySelector('.deck>.foot').hidden=on;keyview.hidden=true;
+  document.getElementById('sliders').hidden=on||!SLIDER_TABS.includes(tabBtns[tabCur].dataset.t);
+  loadview.hidden=!on;if(on){lvErr.textContent='';lvIn.value='';const el=loadview;el.classList.remove('fade');void el.offsetWidth;el.classList.add('fade');setTimeout(()=>lvIn.focus(),50);}}
+function useKey(k,from){
+  const n=loadKey(k);
+  if(n===null){if(from==='box')lvErr.textContent='Это не ключ Lumen. Скопируй ключ целиком — он начинается с LMN-';return false;}
+  if(n&&nick.textContent!==n){nick.textContent=n;}
+  if(!boot.hidden){if(!n&&!okNick(nickIn.value.trim()))return false;boot.hidden=true;step2.hidden=false;}
+  showLoad(false);render();requestAnimationFrame(()=>{tabPlace(tabCur,true);fit();aimAll();crtStart();});
+  toastKey();return true;
+}
+function toastKey(){const t=document.getElementById('kToast');t.hidden=false;t.classList.remove('fade');void t.offsetWidth;t.classList.add('fade');clearTimeout(toastKey.t);toastKey.t=setTimeout(()=>t.hidden=true,2600);}
+document.getElementById('keyBtn').onclick=()=>showLoad(true);
+document.getElementById('lvBack').onclick=()=>showLoad(false);
+document.getElementById('lvGo').onclick=()=>useKey(lvIn.value,'box');
+lvIn.addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();useKey(lvIn.value,'box');}});
+document.getElementById('bootKey').onclick=e=>{e.preventDefault();const box=document.getElementById('bootKeyBox');box.hidden=!box.hidden;if(!box.hidden)document.getElementById('bootKeyIn').focus();};
+document.getElementById('bootKeyIn').addEventListener('input',e=>{const v=e.target.value.trim();if(v.length>20){if(!useKey(v,'boot'))document.getElementById('bootKeyErr').textContent='Это не ключ Lumen — он начинается с LMN-';}});
+// Ctrl+V ключа в любом месте страницы (кроме полей ввода) — сразу загружаем
+addEventListener('paste',e=>{const t=e.target;if(t&&(t.tagName==='INPUT'||t.tagName==='TEXTAREA'))return;const v=(e.clipboardData&&e.clipboardData.getData('text')||'').trim();if(v.startsWith('LMN-')){e.preventDefault();useKey(v,'paste');}});
+// ?k=LMN-… — открыть сразу с текущим стилем (ссылка из бота, расширения или программы)
+(function(){const k=new URLSearchParams(location.search).get('k');if(!k)return;const n=loadKey(k);
+  if(n&&!new URLSearchParams(location.search).get('n')){nickIn.value=n;chk();step1.requestSubmit();}})();
 const qn=new URLSearchParams(location.search).get('n');
 if(qn&&okNick(qn)&&!/^\d+$/.test(qn)){nickIn.value=qn;chk();step1.requestSubmit();}else nickIn.focus();
 </script>
