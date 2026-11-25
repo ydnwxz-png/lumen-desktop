@@ -30,7 +30,9 @@ export function mountLchat(c) {
     .lc-box{flex:1;overflow-y:auto;border:1px solid var(--line);border-radius:16px;padding:8px 6px;background:var(--surface)}
     .lc-day{text-align:center;margin:12px 0 6px}
     .lc-day span{font-size:11px;color:var(--text-3);border:1px solid var(--line);border-radius:99px;padding:2px 10px}
-    .lc-msg{padding:7px 12px;border-radius:12px;cursor:pointer}
+    .lc-msg{padding:7px 12px;border-radius:12px;cursor:pointer;display:grid;grid-template-columns:36px minmax(0,1fr);gap:10px;align-items:start}
+    .lc-av{width:36px;height:36px;border-radius:50%;overflow:hidden;background:var(--surface-2);display:grid;place-items:center;font-weight:800;font-size:14px;color:#0b0b0d;cursor:pointer;margin-top:1px;flex:none}
+    .lc-av img{width:100%;height:100%;object-fit:cover;display:block}
     .lc-msg:hover{background:var(--surface-2)}
     .lc-msg.me{background:rgba(var(--a-rgb),.06)}
     .lc-head{display:flex;align-items:center;gap:7px;font-size:12.5px}
@@ -59,10 +61,12 @@ export function mountLchat(c) {
   top = $('[data-top]', root);
   pin = $('[data-pin]', root);
   box.addEventListener('scroll', loadOlder);
+  // аватарка не загрузилась — остаётся пустой круг, а не значок битой картинки
+  box.addEventListener('error', (e) => { if (e.target.tagName === 'IMG' && e.target.parentNode?.classList.contains('lc-av')) e.target.remove(); }, true);
   box.addEventListener('click', (e) => {
     const ext = e.target.closest('[data-ext]');
     if (ext) return e.preventDefault(), window.api?.app.open(ext.dataset.ext);
-    const nk = e.target.closest('.nick[data-uid]');
+    const nk = e.target.closest('.nick[data-uid], .nick-av[data-uid]');
     if (nk && +nk.dataset.uid) return window.api?.app.open('https://funpay.com/users/' + nk.dataset.uid + '/');
     if (e.target.closest('a')) return e.preventDefault();
     const m = e.target.closest('[data-mid]');
@@ -129,6 +133,14 @@ function draw(stick, keepOld) {
     box.innerHTML = `<div class="empty" style="padding:70px 20px"><div class="orb">${icon('users', 28)}</div><h3>Пока тихо</h3><p>Напиши первым — тебя увидят в Lumen Desktop, расширении и приложении на телефон.</p></div>`;
     return;
   }
+  const AVC = [['#c6f432', '#5ef0c8'], ['#7dd3fc', '#a78bfa'], ['#fda4af', '#fb923c'], ['#fde68a', '#86efac'], ['#c4b5fd', '#f0abfc']];
+  const avatar = (m) => {
+    const uid = +m.u || 0;
+    const ok = typeof m.a === 'string' && /^https:\/\/([a-z0-9-]+\.)?(funpay|sfunpay)\.com\//.test(m.a);
+    if (ok) return `<span class="lc-av nick-av" data-uid="${uid}"><img src="${esc(m.a)}" alt="" loading="lazy" referrerpolicy="no-referrer"></span>`;
+    const c = AVC[Math.abs(uid) % AVC.length];
+    return `<span class="lc-av nick-av" data-uid="${uid}" style="background:linear-gradient(135deg,${c[0]},${c[1]})">${esc((m.n || '?').charAt(0).toUpperCase())}</span>`;
+  };
   const byId = new Map(V.msgs.map((m) => [m.id, m]));
   let dl = '';
   let html = '';
@@ -141,10 +153,10 @@ function draw(stick, keepOld) {
     const cl = CL[m.c] || CL.app;
     const q = m.r && byId.get(m.r);
     const mine = V.tok && String(m.u) === String(V.tok.fp_id);
-    html += `<div class="lc-msg${mine ? ' me' : ''}" data-mid="${m.id}">
+    html += `<div class="lc-msg${mine ? ' me' : ''}" data-mid="${m.id}">${avatar(m)}<div>
       <div class="lc-head"><span class="nick" data-uid="${+m.u || 0}">${esc(m.n || 'id' + m.u)}</span><span title="${cl[1]}">${cl[0]}</span><span class="lc-meta">${hm(m.ts)}</span></div>
       ${q ? `<div class="lc-quote">↪ ${esc(q.n || '')}: ${esc(q.t)}</div>` : ''}
-      <div class="lc-text">${richText(m.t)}</div></div>`;
+      <div class="lc-text">${richText(m.t)}</div></div></div>`;
   }
   box.innerHTML = html;
   if (stick || atBottom) box.scrollTop = box.scrollHeight;

@@ -69,6 +69,10 @@
 /* тонкие крупные цифры */
 .stat .val { font-weight: 400; font-size: 32px; letter-spacing: -.04em; }
 .stat .val small { font-weight: 300; font-size: 20px; }
+/* большие суммы (116 086,73 ₽) не вылезают за карточку: шрифт подстраивается под её ширину */
+.stat { container-type: inline-size; min-width: 0; }
+.stat .val { font-size: clamp(18px, 12.5cqi, 32px); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.stat .val small { font-size: .62em; }
 .page-head h1 { font-weight: 600; font-size: 27px; letter-spacing: -.035em; }
 
 /* кнопки и переключатели — круглее */
@@ -675,3 +679,8 @@ body:has(.scrim, .pop2, .modal-wrap) .lx .topbar, body:has(.scrim, .pop2, .modal
 .ci-top .ci-time { margin-left: auto; }
 .ci-top .lmb { margin: 0 6px 0 5px; }
 
+
+/* большие числа в карточках статистики подстраиваются под ширину карточки, а не вылезают и не режутся «…» */
+.sv-k { container-type: inline-size; }
+.sv-k .v { font-size: clamp(18px, 13cqi, 31px); }
+.home-kpis .sv-k .v { font-size: clamp(17px, 12cqi, 27px); }

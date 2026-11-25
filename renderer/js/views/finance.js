@@ -122,8 +122,10 @@ async function openTxn(t) {
   try {
     const info = await S.backend.txnInfo(t.id);
     b.innerHTML = `<dl class="kv" style="grid-template-columns:150px 1fr;margin:0">${info.rows.map(([k, v]) => `<dt>${esc(k)}</dt><dd>${esc(v)}</dd>`).join('')}</dl>
-      <div class="modal-acts">${info.link ? `<button class="btn" data-link>${icon('external', 15)}Транзакция</button>` : ''}${t.orderId ? `<button class="btn pri" data-order>${icon('bag', 15)}Заказ #${esc(t.orderId)}</button>` : ''}</div>`;
+      ${info.delayUrl ? `<div class="dim" style="font-size:12.5px;margin-top:12px;line-height:1.5">Задержку вывода снимает сам FunPay — для этого он просит пройти верификацию аккаунта.</div>` : ''}
+      <div class="modal-acts">${info.delayUrl ? `<button class="btn" data-delay>${icon('external', 15)}Отключить задержку</button>` : ''}${info.link ? `<button class="btn" data-link>${icon('external', 15)}Транзакция</button>` : ''}${t.orderId ? `<button class="btn pri" data-order>${icon('bag', 15)}Заказ #${esc(t.orderId)}</button>` : ''}</div>`;
     $('[data-link]', b) && ($('[data-link]', b).onclick = () => (window.api ? window.api.app.open(info.link) : window.open(info.link)));
+    $('[data-delay]', b) && ($('[data-delay]', b).onclick = () => (m.close(), S.backend.openBrowser(info.delayUrl)));
     $('[data-order]', b) && ($('[data-order]', b).onclick = () => (m.close(), openOrder(t.orderId)));
   } catch (e) {
     b.innerHTML = `<div class="dim">${esc(e.message)}</div>${t.orderId ? `<div class="modal-acts"><button class="btn pri" data-order>Заказ #${esc(t.orderId)}</button></div>` : ''}`;

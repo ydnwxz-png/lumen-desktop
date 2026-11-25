@@ -357,7 +357,8 @@ export function parseTransactions(html) {
       date,
       ts: parseFpDate(date)?.getTime() || 0,
       payment: squash(txt(e.querySelector('.tc-payment-number'))),
-      orderId: (/#([A-Z0-9]{6,10})/.exec(title) || [])[1] || '',
+      // номер заказа — только у операций по заказу («Заказ #ABCD1234»); у вывода «#…» — номер вывода, не заказ
+      orderId: /заказ|order|замовлен/i.test(title) && !/вывод|withdraw|виведен/i.test(title) ? (/#([A-Z0-9]{6,10})/.exec(title) || [])[1] || '' : '',
     };
   });
   return { items, next: parseContinue(d) };
@@ -608,19 +609,30 @@ export function parseTxnInfo(html) {
   const d = doc(html);
   const rows = [];
   let title = '',
-    link = '';
+    link = '',
+    delayUrl = '';
   for (const tr of d.querySelectorAll('tr')) {
     const th = tr.querySelector('th'),
       td = tr.querySelector('td');
     if (!th || !td) continue;
     const k = txt(th),
       v = squash(td.textContent);
-    const href = td.querySelector('a[href]')?.getAttribute('href') || '';
-    if (!link && href.startsWith('http')) link = href;
-    if (k === 'Описание' || k === 'Description') title = v;
-    if (k) rows.push([k, v]);
+    // ссылка на транзакцию — только внешняя (блокчейн и т.п.). Ссылки FunPay в ячейке — это кнопки вроде
+    // «Отключить задержку» (ведёт на верификацию), их не выдаём за «Транзакцию»
+    let val = v;
+    for (const a of td.querySelectorAll('a[href]')) {
+      const href = a.getAttribute('href') || '';
+      const isFp = /^\/|funpay\.com/.test(href);
+      if (isFp) {
+        const at = squash(a.textContent);
+        if (at && /задержк|delay|затримк/i.test(at)) delayUrl = absUrl(href);
+        if (at) val = squash(val.replace(at, ''));
+      } else if (!link && href.startsWith('http')) link = href;
+    }
+    if (k === 'Описание' || k === 'Description') title = val;
+    if (k) rows.push([k, val]);
   }
-  return { title, rows, link };
+  return { title, rows, link, delayUrl };
 }
 
 export function isWaitMsg(msg) {

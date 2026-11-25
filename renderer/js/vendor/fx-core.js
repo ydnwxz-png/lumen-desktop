@@ -19,6 +19,9 @@
   const MASCOTS = ['cat', 'dragon', 'ghost', 'slime'];
   const FRAMES = ['own', 'fire', 'neon', 'snow', 'rainbow', 'gold',
     'drip', 'venom', 'abyss', 'star', 'briar', 'hands', 'jester'];
+  // шрифт ника и вид подсветки лотов (новое — старые версии просто показывают обычный шрифт и классическую подсветку)
+  const FONTS = ['px', 'px8', 'poster', 'heavy', 'mono', 'comic', 'italic'];
+  const LOTS = ['flow', 'run', 'shine', 'glow', 'neon', 'pixel'];
   const SIG_BAD = /(https?|www\.|t\.me|@|telegram|телег|discord|\d{5,})/i;
   const HEX = /^[0-9a-f]{6}$/i;
   const num = (v, lo, hi, d) => { v = Number(v); return Number.isFinite(v) ? Math.min(hi, Math.max(lo, v)) : d; };
@@ -43,7 +46,8 @@
       const sg = s.sg.replace(/[\u0000-\u001f\u007f<>\u200b-\u200f\u202a-\u202e\u2066-\u2069]/g, '').trim().slice(0, 28);
       if (sg && !SIG_BAD.test(sg)) out.sg = sg;
     }
-    if (s.lh === 1) out.lh = 1;
+    if (s.lh === 1) { out.lh = 1; if (LOTS.includes(s.ls)) out.ls = s.ls; }
+    if (FONTS.includes(s.fo)) out.fo = s.fo;
     return out;
   }
 
@@ -62,5 +66,5 @@
 
   const configured = () => !/example\.com/.test(API);
 
-  g.LumenFX = { API, BOT, FILLS, TEXTS, PARTS, PLATES, BADGES, RARE, MASCOTS, FRAMES, clean, cleanList, configured };
+  g.LumenFX = { API, BOT, FILLS, TEXTS, PARTS, PLATES, BADGES, RARE, MASCOTS, FRAMES, FONTS, LOTS, clean, cleanList, configured };
 })(typeof self !== 'undefined' ? self : window);

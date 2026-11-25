@@ -134,13 +134,16 @@ html img.lm-fr.lm-fr { background-image: linear-gradient(#2a2d36, #2a2d36), coni
 
 
 /* в приложении: ник с украшением не обрезается по краям, свечению есть место */
+/* и со значками без анимированного ника (раньше значок обрезался справа: .ell прятал всё, что вылезает) */
 :is(.ci-top, .grp-name, .chat-head .nm, .prof-name, .ci-name):has(.lm-fx) { overflow: visible !important; }
+:is(.chat-head .nm, .prof-name):has(.lm-deco) { overflow: visible !important; }
 .chat-head .nm .lm-fx, .ci-top .lm-fx { margin-top: -.25em !important; margin-bottom: -.25em !important; }
 .av.lm-fr > img { border-radius: 50%; }
 
 /* шапка чата: ник, значки и подпись — одной строкой, шапка не растёт */
-.chat-head .nm:has(.lm-fx) { display: flex; align-items: center; gap: 0; min-width: 0; white-space: nowrap; }
-.chat-head .nm .lm-fx { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.chat-head .nm:has(.lm-fx, .lm-deco) { display: flex; align-items: center; gap: 0; min-width: 0; white-space: nowrap; }
+.chat-head .nm .lm-fx, .chat-head .nm:has(.lm-deco) > :first-child:not(.lm-deco) { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.chat-head .nm .lm-deco { padding-right: 2px; }
 .chat-head .nm .lm-deco, .chat-head .nm .lm-sig { flex: none; }
 .lm-sig.lm-sig-inline { display: inline-flex !important; margin: 0 0 0 8px; padding: .1em .6em .1em .45em; font-size: 11px; }
 .chat-head .who { max-height: 56px; }
@@ -152,3 +155,20 @@ html img.lm-fr.lm-fr { background-image: linear-gradient(#2a2d36, #2a2d36), coni
 .av.lm-frx-host { overflow: visible; }
 .av.lm-frx-host > img { border-radius: 50%; }
 .av.lm-frx-host > canvas.lm-frx { z-index: 3; }
+
+@font-face { font-family: 'LmNick px'; src: url('../../assets/fonts/nick/px.woff') format('woff'); font-display: swap; }
+@font-face { font-family: 'LmNick px8'; src: url('../../assets/fonts/nick/px8.woff') format('woff'); font-display: swap; }
+@font-face { font-family: 'LmNick poster'; src: url('../../assets/fonts/nick/anton.woff') format('woff'); font-display: swap; }
+@font-face { font-family: 'LmNick heavy'; src: url('../../assets/fonts/nick/archivo.woff') format('woff'); font-display: swap; }
+@font-face { font-family: 'LmNick mono'; src: url('../../assets/fonts/nick/anon.woff') format('woff'); font-display: swap; }
+@font-face { font-family: 'LmNick comic'; src: url('../../assets/fonts/nick/comic.woff') format('woff'); font-display: swap; }
+@font-face { font-family: 'LmNick italic'; src: url('../../assets/fonts/nick/lora.woff') format('woff'); font-display: swap; }
+/* шрифт ника */
+html .lm-fx.lm-fx[class*="lm-fx-fo-"], html .lm-fx.lm-fx[class*="lm-fx-fo-"] * { font-synthesis: none !important; font-style: normal !important; font-weight: 400 !important; }
+html .lm-fx.lm-fx.lm-fx-fo-px, html .lm-fx.lm-fx.lm-fx-fo-px * { font-family: 'LmNick px', ui-monospace, monospace !important; letter-spacing: .03em !important; }
+html .lm-fx.lm-fx.lm-fx-fo-px8, html .lm-fx.lm-fx.lm-fx-fo-px8 * { font-family: 'LmNick px8', ui-monospace, monospace !important; letter-spacing: .02em !important; }
+html .lm-fx.lm-fx.lm-fx-fo-poster, html .lm-fx.lm-fx.lm-fx-fo-poster * { font-family: 'LmNick poster', Impact, sans-serif !important; letter-spacing: .03em !important; }
+html .lm-fx.lm-fx.lm-fx-fo-heavy, html .lm-fx.lm-fx.lm-fx-fo-heavy * { font-family: 'LmNick heavy', 'Arial Black', sans-serif !important; letter-spacing: 0 !important; }
+html .lm-fx.lm-fx.lm-fx-fo-mono, html .lm-fx.lm-fx.lm-fx-fo-mono * { font-family: 'LmNick mono', ui-monospace, monospace !important; letter-spacing: 0 !important; }
+html .lm-fx.lm-fx.lm-fx-fo-comic, html .lm-fx.lm-fx.lm-fx-fo-comic * { font-family: 'LmNick comic', 'Comic Sans MS', cursive !important; letter-spacing: 0 !important; }
+html .lm-fx.lm-fx.lm-fx-fo-italic, html .lm-fx.lm-fx.lm-fx-fo-italic * { font-family: 'LmNick italic', Georgia, serif !important; letter-spacing: 0 !important; }

@@ -74,7 +74,7 @@ function sendTheme(f) {
   f.contentWindow?.postMessage({ lumen: 1, type: 'theme', vars, theme: document.documentElement.dataset.theme }, '*');
 }
 
-const pick = (c) => ({ id: c.id, name: c.name, preview: c.preview, unread: c.unread, time: c.time });
+const pick = (c) => ({ id: c.id, name: c.name, preview: c.preview, unread: c.unread, time: c.time, avatar: c.avatar || '', msg: c.nodeMsg || 0 });
 
 // что страница плагина может попросить у приложения
 const METHODS = {
@@ -87,6 +87,8 @@ const METHODS = {
     return id ? { id, name: c?.name || '' } : null;
   },
   send: (_, chat, text) => S.backend.send(String(chat), String(text)),
+  // открыть чат текущего аккаунта в самой программе (вкладка «Чаты»)
+  goChat: (_, chat) => (bus.emit('nav', 'chats'), bus.emit('open-chat', String(chat)), true),
   toast: (_, title, body, kind) => (toast(String(title), String(body || ''), { kind: kind === 'ok' || kind === 'err' ? kind : '' }), true),
   confirm: (_, title, text, yes) => confirmBox(String(title), String(text || ''), { yes: String(yes || 'Да') }),
   copy: (_, text) => copyText(String(text)).then(() => true),

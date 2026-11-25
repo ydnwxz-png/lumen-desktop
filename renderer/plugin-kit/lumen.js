@@ -28,6 +28,7 @@
     me: () => call('me'),
     chats: () => call('chats'),
     openChat: () => call('openChat'),
+    goChat: (chat) => call('goChat', chat),
     send: (chat, text) => call('send', chat, text),
     toast: (title, body = '', kind = '') => call('toast', title, body, kind),
     confirm: (title, text = '', yes = 'Да') => call('confirm', title, text, yes),

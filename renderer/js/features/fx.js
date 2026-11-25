@@ -76,7 +76,7 @@ const placeOf = (el) => (el.closest('.prof-name') ? 'profile' : el.closest('.cha
 
 function decorate(el, st) {
   const kind = kindOf(el);
-  const sig = [st.c.join(''), st.f, st.t, st.p, st.z, st.s, st.k, st.pl || '', kind, document.documentElement.dataset.theme].join('|');
+  const sig = [st.c.join(''), st.f, st.t, st.p, st.z, st.s, st.k, st.pl || '', st.fo || '', kind, document.documentElement.dataset.theme].join('|');
   if (el.dataset.lmfx === sig) return;
   undo(el);
   // своё оформление ника (стиль-метка в Lumen) уступает купленному украшению
@@ -88,6 +88,7 @@ function decorate(el, st) {
   el.dataset.lmfx = sig;
   el.classList.add('lm-fx', 'lm-fx-f-' + st.f, bgLight(el) ? 'lm-fx-onlight' : 'lm-fx-ondark');
   if (kind !== 'big') el.classList.add('lm-fx-sm');
+  if (st.fo) el.classList.add('lm-fx-fo-' + st.fo);   // шрифт ника
   if (st.pl) {
     el.classList.add('lm-fx-pl', 'lm-pl-' + st.pl);
     if (!/[A-ZА-ЯЁ0-9bdfhklt@#$%&!?ібдйё]/.test(el.textContent)) el.classList.add('lm-pl-x');
@@ -446,7 +447,8 @@ function draw(el, dt) {
     PAINT[t]?.(ctx, p, k, a, st);
     if (p.life >= p.max || p.y < -20 || p.y > h + 20) f.P[i] = spawn(st, w, h, false, sc, bx, by, bw, bh);
   });
-  erase.push([ox + pad[0] / 2 - 1, oy + pad[1] / 2 + f.box.h * 0.12, f.box.w + 2, f.box.h * 0.8]);
+  // дым полупрозрачный и крупный — «окно» над ником в нём видно тёмным пятном, поэтому его не вырезаем
+  if (st.p !== 'smoke') erase.push([ox + pad[0] / 2 - 1, oy + pad[1] / 2 + f.box.h * 0.12, f.box.w + 2, f.box.h * 0.8]);
   ctx.restore();
   return true;
 }

@@ -76,7 +76,8 @@ function onEvent(ev) {
   if (ev.type === 'delivered' && d.left != null && d.left <= 2) bus.emit('bell-add', { kind: 'stock', title: 'Мало товара', text: `«${d.rule.name}» — осталось ${d.left} шт. в автовыдаче`, go: 'auto' });
   if (ev.type === 'deliveryEmpty') toast('⚠️ Закончился товар', `«${d.rule.name}» — заказ #${d.order.id} нужно выдать вручную`, { kind: 'err', icon: 'box', ms: 15000 });
   if (ev.type === 'notify') {
-    const open = d.url ? () => S.backend?.openBrowser(d.url) : undefined;
+    // плагин указал чат (текущего аккаунта) — по клику открываем его в программе, ссылку — во встроенном браузере
+    const open = d.url ? () => S.backend?.openBrowser(d.url) : d.chat ? () => (bus.emit('nav', 'chats'), bus.emit('open-chat', String(d.chat))) : undefined;
     // окно открыто — всплывашка внутри; свёрнуто или в трее — как обычное уведомление Lumen (со звуком)
     if (S.focused) toast(d.title || d.from || 'Плагин', d.text, { icon: 'layers', ms: 8000, onClick: open });
     else notify({ title: d.title || d.from || 'Плагин', name: d.from || 'Плагин', body: d.text, raw: true, kind: d.kind === 'order' ? 'order' : 'msg', onClick: open });
