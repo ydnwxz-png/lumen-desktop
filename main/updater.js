@@ -46,6 +46,15 @@ const os = require('os');
 // …/Lumen.app/Contents/MacOS/Lumen → …/Lumen.app
 const macBundle = () => path.resolve(process.execPath, '..', '..', '..');
 const MAC_DIR = () => path.join(app.getPath('userData'), 'mac-update');
+// почему на Mac не получается обновиться самому (пусто — всё в порядке)
+function macWhy() {
+  if (process.platform !== 'darwin') return '';
+  const b = macBundle();
+  if (b.startsWith('/Volumes/')) return 'Lumen запущен прямо из .dmg — перетащи его в «Программы» и запускай оттуда';
+  if (b.includes('/AppTranslocation/')) return 'macOS запустила Lumen из временной папки — перетащи его в «Программы» и запусти заново';
+  try { fs.accessSync(path.dirname(b), fs.constants.W_OK); fs.accessSync(b, fs.constants.W_OK); } catch { return 'Нет прав на запись в папку с Lumen — положи его в «Программы»'; }
+  return '';
+}
 function canMac() {
   if (!app.isPackaged || process.platform !== 'darwin' || !repo) return false;
   const b = macBundle();
@@ -55,6 +64,7 @@ function canMac() {
 const run = (cmd, args) => new Promise((res, rej) => execFile(cmd, args, { timeout: 120000 }, (e, out, err) => (e ? rej(new Error(String(err || e.message).slice(0, 200))) : res(out))));
 const macReady = (v) => path.join(MAC_DIR(), v, 'Lumen.app');
 let macBusy = false;
+let macRetry = null;
 
 async function macDownload(v, asset) {
   if (macBusy) return;
@@ -146,6 +156,8 @@ async function manualCheck() {
   const j = await r.json();
   const v = String(j.tag_name || '').replace(/^v/, '');
   if (!v || !newer(v, app.getVersion())) return set({ state: 'none', latest: '', url: '', checkedAt: Date.now() });
+  let why = '';
+  if (process.platform === 'darwin' && !canMac()) why = macWhy();
   if (canMac()) {
     const arch = process.arch === 'arm64' ? 'arm64' : 'x64';
     const asset = (j.assets || []).find((a) => a.name === `Lumen-${v}-${arch}.zip` || (a.name.endsWith('.zip') && a.name.includes(arch) && a.name.includes(v)));
@@ -155,8 +167,11 @@ async function manualCheck() {
       if (getSettings().autoUpdate !== false || installOnReady) return macDownload(v, asset);
       return set({ state: 'available', checkedAt: Date.now() });
     }
+    why = `Версия для Mac ещё собирается на GitHub — проверю снова через 10 минут`;
+    clearTimeout(macRetry);
+    macRetry = setTimeout(check, 10 * 60e3);   // релиз уже есть, а .zip для Mac загружается позже — не ждём 4 часа
   }
-  set({ state: 'manual', latest: v, url: j.html_url, checkedAt: Date.now() });
+  set({ state: 'manual', latest: v, url: j.html_url, why, checkedAt: Date.now() });
 }
 
 async function check() {
@@ -216,10 +231,16 @@ module.exports = {
   init,
   check,
   state: () => { const { asset, ...st } = state; return { ...st, auto: canAuto() || canMac(), repo: repo ? `${repo.owner}/${repo.repo}` : '' }; },
-  download: () => {
-    if (au && state.state === 'available') au.downloadUpdate();
-    else if (canMac() && state.state === 'available' && state.asset) macDownload(state.latest, state.asset);
-    else if (state.url) shell.openExternal(state.url);
+  download: async () => {
+    if (au && state.state === 'available') return au.downloadUpdate();
+    if (canMac() && state.state === 'available' && state.asset) return macDownload(state.latest, state.asset);
+    if (canMac() && state.state === 'manual') {
+      // может, файл для Mac уже появился в релизе — проверяем ещё раз и ставим сами
+      installOnReady = false;
+      await manualCheck().catch(() => {});
+      if (state.state !== 'manual') return;
+    }
+    if (state.url) shell.openExternal(state.url);
   },
   install: () => {
     // true, true — тихо (без окна установщика) и сразу открыть новый Lumen
