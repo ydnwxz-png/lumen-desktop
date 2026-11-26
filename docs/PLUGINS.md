@@ -120,8 +120,11 @@ await api.account.lotSetActive(lot, true)       // включить / выклю
 await api.account.lotSetPrice(lot, 199)         // поменять цену
 await api.account.raiseGames()                  // что можно поднять
 await api.account.raiseGame(gameId, nodes)      // поднять
-await api.account.catOffers(node, chips)        // кто продаёт в категории: { title, rows: [{ id, uid, name, title, price, promo, top }] }
+await api.account.catOffers(node, chips)        // кто продаёт в категории: { title, rows: [{ id, uid, name, title, price, priceNum,
+                                                //   server, side, amount, online, reviews, f, promo, top }] }
+                                                //   priceNum — цена для покупателя числом; f — фильтры лота (сервер, тип…);
                                                 //   promo — продавец в закрепе FunPay, top — его лот сейчас в самом верху
+await api.account.lotCalc(node)                 // комиссия раздела: [{ name, unit, k }] — цена покупателя = твоя цена × k
 ```
 
 **`api.accounts()` — все аккаунты, добавленные в Lumen** (не только тот, на котором сидишь):
