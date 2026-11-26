@@ -542,7 +542,31 @@ export function parseCatOffers(html) {
       prev.promo ||= promo;
       continue;
     }
-    by.set(id, { id, uid: String(uid), name: squash(txt(a.querySelector('.media-user-name'))), title: squash(txt(a.querySelector('.tc-desc-text') || a.querySelector('.tc-desc'))).slice(0, 140), price: squash(txt(a.querySelector('.tc-price'))), promo, top });
+    const pe = a.querySelector('.tc-price');
+    const pn = parseFloat(String(pe?.getAttribute('data-s') || txt(pe).replace(txt(pe?.querySelector('.unit')), '')).replace(/\s/g, '').replace(',', '.'));
+    // фильтры раздела (сервер, сторона, тип…) — чтобы сравнивать только с такими же лотами
+    const f = {};
+    for (const at of a.attributes || []) {
+      const k = at.name;
+      if (k.startsWith('data-') && !/^data-(user|online|href|s|id|offer|auto)$/.test(k)) f[k.slice(5)] = at.value;
+    }
+    const rc = txt(a.querySelector('.rating-mini-count')).replace(/\D/g, '');
+    by.set(id, {
+      id,
+      uid: String(uid),
+      name: squash(txt(a.querySelector('.media-user-name'))),
+      title: squash(txt(a.querySelector('.tc-desc-text') || a.querySelector('.tc-desc'))).slice(0, 140),
+      price: squash(txt(pe)),
+      priceNum: Number.isFinite(pn) ? Math.round(pn * 100) / 100 : 0,
+      server: squash(txt(a.querySelector('.tc-server'))),
+      side: squash(txt(a.querySelector('.tc-side'))),
+      amount: squash(txt(a.querySelector('.tc-amount'))),
+      online: a.getAttribute('data-online') === '1' || !!a.querySelector('.media-user.online'),
+      reviews: rc ? +rc : 0,
+      f,
+      promo,
+      top,
+    });
   }
   return { title: squash(txt(d.querySelector('h1'))), rows: [...by.values()] };
 }

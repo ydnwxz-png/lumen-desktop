@@ -1671,8 +1671,11 @@ function showLoad(on){['paneBox','save'].forEach(id=>document.getElementById(id)
 function useKey(k,from){
   const n=loadKey(k);
   if(n===null){if(from==='box')lvErr.textContent='Это не ключ Lumen. Скопируй ключ целиком — он начинается с LMN-';return false;}
-  if(n&&nick.textContent!==n){nick.textContent=n;}
-  if(!boot.hidden){if(!n&&!okNick(nickIn.value.trim()))return false;boot.hidden=true;step2.hidden=false;}
+  // ник, который уже выбран (или введён), не меняем: ключ переносит только стиль. Ник из ключа — только если своего ещё нет
+  const typed=!boot.hidden&&okNick(nickIn.value.trim())?nickIn.value.trim():'';
+  const keep=boot.hidden?nick.textContent.trim():typed;
+  if(keep)nick.textContent=keep;else if(n)nick.textContent=n;
+  if(!boot.hidden){if(!keep&&!n)return false;boot.hidden=true;step2.hidden=false;}
   showLoad(false);render();requestAnimationFrame(()=>{tabPlace(tabCur,true);fit();aimAll();crtStart();});
   toastKey();return true;
 }
