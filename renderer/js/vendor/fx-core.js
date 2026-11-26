@@ -18,7 +18,7 @@
   const RARE = ['early', 'top'];
   const MASCOTS = ['cat', 'dragon', 'ghost', 'slime'];
   const FRAMES = ['own', 'fire', 'neon', 'snow', 'rainbow', 'gold',
-    'drip', 'venom', 'abyss', 'star', 'briar', 'hands', 'jester'];
+    'drip', 'venom', 'abyss', 'star', 'briar', 'spikes', 'hands', 'jester'];
   // шрифт ника и вид подсветки лотов (новое — старые версии просто показывают обычный шрифт и классическую подсветку)
   const FONTS = ['px', 'px8', 'poster', 'heavy', 'mono', 'comic', 'italic'];
   const LOTS = ['flow', 'run', 'shine', 'glow', 'neon', 'pixel'];

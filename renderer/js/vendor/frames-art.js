@@ -10,7 +10,7 @@
   // id → название. Порядок = порядок в редакторе.
   const LIST = [
     ['drip', 'Чёрный венец'], ['venom', 'Синий венец'], ['abyss', 'Бездна'], ['star', 'Чёрная звезда'],
-    ['briar', 'Терновник'], ['hands', 'Руки'], ['jester', 'Шут'],
+    ['briar', 'Терновник'], ['spikes', 'Хромовый венец'], ['hands', 'Руки'], ['jester', 'Шут'],
   ];
   const IDS = LIST.map(x => x[0]);
   const WINGS = [];
@@ -37,7 +37,7 @@
 
   /* ---------- рамки-картинки (венцы, звезда, руки, шут) ---------- */
   const PIC = g.LumenFramesImg || {};
-  const TINT = { drip: 1, abyss: 1, star: 1, briar: 1 };   // эти можно перекрасить выбранным цветом
+  const TINT = { drip: 1, abyss: 1, star: 1, briar: 1, spikes: 1 };   // эти можно перекрасить выбранным цветом
   const TINTABLE = Object.keys(TINT);
   const pics = {};
   function pic(id) {
@@ -60,9 +60,10 @@
   /** Сколько места (в единицах рисунка) занимает рамка — для картинок меньше, чем весь холст, значит чётче */
   const box = (id, compact, fit = 9) => { const b = !PIC[id] ? B : id === 'jester' ? Math.max(picD(id, compact, fit), 2.9 * R) : picD(id, compact, fit) + 18; return fit < 9 ? Math.min(b, 2 * fit * R + 8) : b; };
   function drawPic(x, id, T, C, light, compact, fit = 9) {
-    const P = pic(id === 'briar' && light && PIC.briar_l ? 'briar_l' : id);
-    if (!P || !P.ok) return;
     const mode = TINT[id] ? tintMode(C) : 'orig', wh = mode === 'white' || mode === 'orig', dk = mode === 'dark';
+    const colored = mode === 'color';   // свой цвет рамки — на любом фоне рисуем как в редакторе: плотно и со свечением
+    const P = pic(id === 'briar' && light && !colored && PIC.briar_l ? 'briar_l' : id);
+    if (!P || !P.ok) return;
     const D = picD(id, compact, fit), bx = box(id, compact, fit);
     const M = x.getTransform ? x.getTransform() : { a: 1, b: 0 }, sc = Math.hypot(M.a, M.b) || 1, W = Math.min(1024, Math.ceil(bx * sc));
     if (!scr) scr = document.createElement('canvas');
@@ -72,7 +73,7 @@
     s.setTransform(W / bx, 0, 0, W / bx, W / 2, W / 2);   // (0,0) — центр аватарки
     const place = () => {
       s.save();
-      if (id === 'briar') s.rotate(Math.sin(TAU * T) * 0.05);
+      if (id === 'briar' || id === 'spikes') s.rotate(Math.sin(TAU * T) * 0.05);
       if (id === 'hands') { const k = 1 + 0.012 * Math.sin(TAU * T); s.scale(k, k); }
       if (id === 'jester') { const top = -R * 0.6; s.translate(0, top); s.rotate(Math.sin(TAU * T) * 0.035); s.translate(0, -top); }
       s.drawImage(P.im, -D / 2, -D / 2, D, D);
@@ -103,7 +104,7 @@
     }
     s.globalCompositeOperation = 'source-over';
     x.save();
-    if (!light) {   // на тёмном фоне — свечение, чтобы чёрная рамка не терялась
+    if (!light || colored) {   // на тёмном фоне — свечение, чтобы чёрная рамка не терялась; цветная светится всегда
       const glow = id === 'hands' ? 'd4234a' : id === 'venom' ? '3f5bff' : id === 'jester' ? '000000' : (wh || dk ? 'aab4d0' : C);
       const beat = id === 'hands' ? Math.max(Math.exp(-Math.pow((T - 0.1) / 0.05, 2)), 0.7 * Math.exp(-Math.pow((T - 0.28) / 0.05, 2))) : 0.5 + 0.5 * Math.sin(TAU * T);
       x.shadowColor = hexA(glow, id === 'jester' ? 0.6 : 0.3 + 0.3 * beat); x.shadowBlur = 6 + 6 * beat;
@@ -145,7 +146,7 @@
       }
       if (fi < N) setTimeout(step, 16);
     };
-    const P = PIC[id] && pic(id === 'briar' && light && PIC.briar_l ? 'briar_l' : id);
+    const P = PIC[id] && pic(id === 'briar' && light && !(TINT[id] && tintMode(C) === 'color') && PIC.briar_l ? 'briar_l' : id);
     if (P && !P.ok) P.wait.push(step); else step();
     return s;
   }
@@ -232,7 +233,7 @@
   }
 
   function tick() {
-    const fi = reduce() ? 0 : Math.floor(performance.now() / (DUR / N)) % N;
+    const fi = Math.floor(performance.now() / (DUR / N)) % N;   // рамку выбрал сам человек — крутим всегда, даже если в Windows выключены «эффекты анимации»
     live.forEach(o => {
       if (o.host && !place(o)) return;
       if (!o.vis || !o.cv.isConnected) return;
