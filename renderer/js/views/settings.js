@@ -717,7 +717,7 @@ async function about(w) {
         error: `Не получилось проверить: ${st.error || ''}`,
         idle: 'Проверю через несколько секунд после запуска',
       }[st.state] || '';
-      stEl.textContent = t;
+      stEl.textContent = t + (st.state === 'manual' && st.why ? ` · ${st.why}` : '');
       act.classList.toggle('hidden', !['ready', 'manual', 'available'].includes(st.state));
       act.textContent = st.state === 'ready' ? 'Перезапустить' : 'Скачать';
     };
